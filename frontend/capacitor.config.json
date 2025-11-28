@@ -1,0 +1,26 @@
+{
+  "appId": "com.freelancehub.app",
+  "appName": "FreelanceHub",
+  "webDir": "build",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#ffffff"
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
+    }
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#ffffff"
+  },
+  "android": {
+    "backgroundColor": "#ffffff"
+  }
+}

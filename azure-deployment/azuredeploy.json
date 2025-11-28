@@ -1,0 +1,530 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "defaultValue": "freelancehub",
+      "metadata": {
+        "description": "Base name for all resources"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources"
+      }
+    },
+    "environment": {
+      "type": "string",
+      "defaultValue": "test",
+      "allowedValues": ["test", "staging", "production"],
+      "metadata": {
+        "description": "Environment type"
+      }
+    },
+    "githubRepoUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "GitHub repository URL (e.g., https://github.com/username/repo)"
+      }
+    },
+    "githubBranch": {
+      "type": "string",
+      "defaultValue": "main",
+      "metadata": {
+        "description": "GitHub branch to deploy from"
+      }
+    },
+    "githubToken": {
+      "type": "securestring",
+      "metadata": {
+        "description": "GitHub Personal Access Token for deployment"
+      }
+    },
+    "jwtSecret": {
+      "type": "securestring",
+      "defaultValue": "[newGuid()]",
+      "metadata": {
+        "description": "Secret key for JWT token signing"
+      }
+    },
+    "stripeApiKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Stripe API Secret Key"
+      }
+    },
+    "cosmosDbThroughput": {
+      "type": "int",
+      "defaultValue": 400,
+      "minValue": 400,
+      "maxValue": 10000,
+      "metadata": {
+        "description": "Cosmos DB throughput (RU/s)"
+      }
+    },
+    "appServicePlanSku": {
+      "type": "string",
+      "defaultValue": "B1",
+      "allowedValues": ["F1", "B1", "B2", "S1", "S2", "P1v2"],
+      "metadata": {
+        "description": "App Service Plan SKU"
+      }
+    }
+  },
+  "variables": {
+    "uniqueSuffix": "[uniqueString(resourceGroup().id)]",
+    "cosmosDbAccountName": "[concat(parameters('appName'), '-db-', variables('uniqueSuffix'))]",
+    "cosmosDbDatabaseName": "freelancer_platform",
+    "appServicePlanName": "[concat(parameters('appName'), '-plan-', variables('uniqueSuffix'))]",
+    "backendAppName": "[concat(parameters('appName'), '-api-', variables('uniqueSuffix'))]",
+    "staticWebAppName": "[concat(parameters('appName'), '-web-', variables('uniqueSuffix'))]",
+    "appInsightsName": "[concat(parameters('appName'), '-insights-', variables('uniqueSuffix'))]",
+    "logAnalyticsName": "[concat(parameters('appName'), '-logs-', variables('uniqueSuffix'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2021-06-01",
+      "name": "[variables('logAnalyticsName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[variables('appInsightsName')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
+      ],
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "apiVersion": "2023-04-15",
+      "name": "[variables('cosmosDbAccountName')]",
+      "location": "[parameters('location')]",
+      "kind": "MongoDB",
+      "properties": {
+        "databaseAccountOfferType": "Standard",
+        "apiProperties": {
+          "serverVersion": "4.2"
+        },
+        "locations": [
+          {
+            "locationName": "[parameters('location')]",
+            "failoverPriority": 0,
+            "isZoneRedundant": false
+          }
+        ],
+        "capabilities": [
+          {
+            "name": "EnableMongo"
+          },
+          {
+            "name": "DisableRateLimitingResponses"
+          }
+        ],
+        "backupPolicy": {
+          "type": "Periodic",
+          "periodicModeProperties": {
+            "backupIntervalInMinutes": 240,
+            "backupRetentionIntervalInHours": 8
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosDbAccountName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "[variables('cosmosDbDatabaseName')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/users')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "users",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["id"] }, "options": { "unique": true } },
+            { "key": { "keys": ["email"] }, "options": { "unique": true } },
+            { "key": { "keys": ["role"] } }
+          ]
+        },
+        "options": {
+          "throughput": "[parameters('cosmosDbThroughput')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/freelancer_profiles')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "freelancer_profiles",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["id"] }, "options": { "unique": true } },
+            { "key": { "keys": ["user_id"] }, "options": { "unique": true } },
+            { "key": { "keys": ["subscription_status", "category", "average_rating"] } },
+            { "key": { "keys": ["skills"] } }
+          ]
+        },
+        "options": {
+          "throughput": "[parameters('cosmosDbThroughput')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/reviews')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "reviews",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["freelancer_id", "created_at"] } },
+            { "key": { "keys": ["freelancer_id", "client_id"] }, "options": { "unique": true } }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/messages')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "messages",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["sender_id", "receiver_id", "created_at"] } },
+            { "key": { "keys": ["receiver_id", "is_read"] } }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/hiring_requests')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "hiring_requests",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["freelancer_id", "status"] } },
+            { "key": { "keys": ["client_id", "created_at"] } }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/follows')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "follows",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["follower_id", "freelancer_id"] }, "options": { "unique": true } },
+            { "key": { "keys": ["freelancer_id"] } }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/posts')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "posts",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["freelancer_id", "created_at"] } },
+            { "key": { "keys": ["created_at"] } }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/post_likes')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "post_likes",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["post_id", "user_id"] }, "options": { "unique": true } }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/notifications')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "notifications",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["user_id", "created_at"] } },
+            { "key": { "keys": ["user_id", "is_read"] } }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/sessions')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "sessions",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["session_token"] }, "options": { "unique": true } },
+            { "key": { "keys": ["expires_at"] } }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosDbAccountName'), '/', variables('cosmosDbDatabaseName'), '/payment_transactions')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosDbAccountName'), variables('cosmosDbDatabaseName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "payment_transactions",
+          "indexes": [
+            { "key": { "keys": ["_id"] } },
+            { "key": { "keys": ["session_id"] }, "options": { "unique": true } },
+            { "key": { "keys": ["user_id", "created_at"] } }
+          ]
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2022-03-01",
+      "name": "[variables('appServicePlanName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('appServicePlanSku')]"
+      },
+      "kind": "linux",
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-03-01",
+      "name": "[variables('backendAppName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosDbAccountName'))]",
+        "[resourceId('Microsoft.Insights/components', variables('appInsightsName'))]"
+      ],
+      "kind": "app,linux",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "httpsOnly": true,
+        "siteConfig": {
+          "linuxFxVersion": "PYTHON|3.11",
+          "alwaysOn": "[if(equals(parameters('appServicePlanSku'), 'F1'), false(), true())]",
+          "cors": {
+            "allowedOrigins": [
+              "[concat('https://', variables('staticWebAppName'), '.azurestaticapps.net')]",
+              "http://localhost:3000"
+            ],
+            "supportCredentials": true
+          },
+          "appSettings": [
+            {
+              "name": "MONGO_URL",
+              "value": "[listConnectionStrings(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosDbAccountName')), '2023-04-15').connectionStrings[0].connectionString]"
+            },
+            {
+              "name": "DB_NAME",
+              "value": "[variables('cosmosDbDatabaseName')]"
+            },
+            {
+              "name": "JWT_SECRET",
+              "value": "[parameters('jwtSecret')]"
+            },
+            {
+              "name": "STRIPE_API_KEY",
+              "value": "[parameters('stripeApiKey')]"
+            },
+            {
+              "name": "CORS_ORIGINS",
+              "value": "[concat('https://', variables('staticWebAppName'), '.azurestaticapps.net')]"
+            },
+            {
+              "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+              "value": "true"
+            },
+            {
+              "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+              "value": "[reference(resourceId('Microsoft.Insights/components', variables('appInsightsName')), '2020-02-02').ConnectionString]"
+            }
+          ],
+          "appCommandLine": "gunicorn -w 4 -k uvicorn.workers.UvicornWorker server:app --bind 0.0.0.0:8000"
+        }
+      },
+      "resources": [
+        {
+          "type": "sourcecontrols",
+          "apiVersion": "2022-03-01",
+          "name": "web",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/sites', variables('backendAppName'))]"
+          ],
+          "properties": {
+            "repoUrl": "[parameters('githubRepoUrl')]",
+            "branch": "[parameters('githubBranch')]",
+            "isManualIntegration": false,
+            "deploymentRollbackEnabled": true,
+            "isMercurial": false,
+            "gitHubActionConfiguration": {
+              "codeConfiguration": {
+                "runtimeStack": "python",
+                "runtimeVersion": "3.11"
+              },
+              "generateWorkflowFile": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.Web/staticSites",
+      "apiVersion": "2022-03-01",
+      "name": "[variables('staticWebAppName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', variables('backendAppName'))]"
+      ],
+      "sku": {
+        "name": "Free",
+        "tier": "Free"
+      },
+      "properties": {
+        "repositoryUrl": "[parameters('githubRepoUrl')]",
+        "branch": "[parameters('githubBranch')]",
+        "repositoryToken": "[parameters('githubToken')]",
+        "buildProperties": {
+          "appLocation": "/frontend",
+          "outputLocation": "build",
+          "appBuildCommand": "yarn build",
+          "skipGithubActionWorkflowGeneration": false
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Web/staticSites/config",
+      "apiVersion": "2022-03-01",
+      "name": "[concat(variables('staticWebAppName'), '/appsettings')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/staticSites', variables('staticWebAppName'))]",
+        "[resourceId('Microsoft.Web/sites', variables('backendAppName'))]"
+      ],
+      "properties": {
+        "REACT_APP_BACKEND_URL": "[concat('https://', variables('backendAppName'), '.azurewebsites.net')]"
+      }
+    }
+  ],
+  "outputs": {
+    "frontendUrl": {
+      "type": "string",
+      "value": "[concat('https://', variables('staticWebAppName'), '.azurestaticapps.net')]"
+    },
+    "backendUrl": {
+      "type": "string",
+      "value": "[concat('https://', variables('backendAppName'), '.azurewebsites.net')]"
+    },
+    "cosmosDbConnectionString": {
+      "type": "securestring",
+      "value": "[listConnectionStrings(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosDbAccountName')), '2023-04-15').connectionStrings[0].connectionString]"
+    },
+    "staticWebAppName": {
+      "type": "string",
+      "value": "[variables('staticWebAppName')]"
+    },
+    "backendAppName": {
+      "type": "string",
+      "value": "[variables('backendAppName')]"
+    },
+    "cosmosDbAccountName": {
+      "type": "string",
+      "value": "[variables('cosmosDbAccountName')]"
+    },
+    "appInsightsInstrumentationKey": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Insights/components', variables('appInsightsName')), '2020-02-02').InstrumentationKey]"
+    }
+  }
+}
