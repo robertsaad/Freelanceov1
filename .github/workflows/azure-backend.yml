@@ -9,10 +9,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -21,15 +21,16 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        working-directory: backend
         run: |
+          cd backend
           python -m venv env
-          source env/bin/activate
+          .\env\Scripts\activate
           pip install -r requirements.txt
 
       - name: Zip backend
-        working-directory: backend
-        run: zip -r ../backend.zip .
+        run: |
+          cd backend
+          powershell Compress-Archive -Path * -DestinationPath ../backend.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
@@ -38,7 +39,7 @@ jobs:
           path: backend.zip
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: build
 
     steps:
