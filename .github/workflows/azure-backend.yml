@@ -8,38 +8,65 @@ on:
       - backend/**
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: windows-latest
 
-    defaults:
-      run:
-        working-directory: backend
-
     steps:
-      - name: Checkout repository
+      # -----------------------------
+      # 1. Checkout Code
+      # -----------------------------
+      - name: Checkout code
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # 2. Setup Python
+      # -----------------------------
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
+      # ---------------------------------------------------
+      # 3. Install Dependencies (inside backend directory)
+      # ---------------------------------------------------
       - name: Install dependencies
+        working-directory: ./backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create backend.zip (exclude env + caches)
-        shell: pwsh
+      # ---------------------------------------------------
+      # 4. Create ZIP (excluding venv + caches)
+      # ---------------------------------------------------
+      - name: Create backend.zip package
+        working-directory: ./backend
         run: |
-          $exclude = @("env", "__pycache__", "*.zip")
-          $items = Get-ChildItem -Recurse -File | Where-Object {
-            $_.FullName -notmatch "env" -and $_.FullName -notmatch "__pycache__"
-          }
-          Compress-Archive -Path $items.FullName -DestinationPath ../backend.zip -Force
+          $items = Get-ChildItem -Path . -Exclude env, __pycache__, *.zip
+          Compress-Archive -Path $items -DestinationPath ../backend-package.zip -Force
 
-      - name: Upload backend artifact
+      # ---------------------------------------------------
+      # 5. Upload Artifact
+      # ---------------------------------------------------
+      - name: Upload backend package
         uses: actions/upload-artifact@v4
         with:
           name: backend-package
-          path: backend.zip
+          path: backend-package.zip
+          compression-level: 0
+
+      # ---------------------------------------------------
+      # 6. Azure Login
+      # ---------------------------------------------------
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ---------------------------------------------------
+      # 7. Deploy ZIP to Azure Web App
+      # ---------------------------------------------------
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: "freelancehub-api-edubw3ephznye"
+          package: backend-package.zip
