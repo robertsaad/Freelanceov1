@@ -34,8 +34,8 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-2" data-testid="logo-link">
-              <Briefcase className="h-8 w-8 text-cyan-600" />
-              <span className="text-xl font-bold text-gray-900">FreelanceHub</span>
+              <img src="/logo-icon.png" alt="Freelanceo" className="h-8 w-8" />
+              <span className="text-xl font-bold text-gray-900">Freelanceo</span>
             </Link>
           </div>
 
