@@ -311,7 +311,7 @@ export default function Landing() {
             Ready to Start Your Freelance Journey?
           </h2>
           <p className="text-xl text-cyan-100 mb-8">
-            Join thousands of professionals who have grown their careers with FreelanceHub.
+            Join thousands of professionals who have grown their careers with Freelanceo.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" className="bg-white text-cyan-600 hover:bg-gray-100" asChild>
