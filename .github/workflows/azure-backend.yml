@@ -16,7 +16,7 @@ jobs:
         working-directory: backend
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -29,15 +29,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Zip backend code
+      - name: Create backend.zip (exclude env + caches)
+        shell: pwsh
         run: |
           $exclude = @("env", "__pycache__", "*.zip")
-          $items = Get-ChildItem -Exclude $exclude
-          Compress-Archive -Path $items -DestinationPath ../backend.zip -Force
+          $items = Get-ChildItem -Recurse -File | Where-Object {
+            $_.FullName -notmatch "env" -and $_.FullName -notmatch "__pycache__"
+          }
+          Compress-Archive -Path $items.FullName -DestinationPath ../backend.zip -Force
 
       - name: Upload backend artifact
         uses: actions/upload-artifact@v4
         with:
-          name: backend-zip
+          name: backend-package
           path: backend.zip
-          compression-level: 0
