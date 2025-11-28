@@ -59,8 +59,8 @@ export default function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2">
-            <Briefcase className="h-10 w-10 text-cyan-600" />
-            <span className="text-2xl font-bold text-gray-900">FreelanceHub</span>
+            <img src="/logo-icon.png" alt="Freelanceo" className="h-10 w-10" />
+            <span className="text-2xl font-bold text-gray-900">Freelanceo</span>
           </Link>
         </div>
 
