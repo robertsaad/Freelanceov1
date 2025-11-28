@@ -9,11 +9,11 @@ export default function Footer() {
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <Briefcase className="h-8 w-8 text-cyan-400" />
-              <span className="text-xl font-bold">FreelanceHub</span>
+              <img src="/logo-icon.png" alt="Freelanceo" className="h-8 w-8" />
+              <span className="text-xl font-bold">Freelanceo</span>
             </div>
-            <p className="text-gray-400 max-w-md">
-              Connect with top freelance talent worldwide. Find the perfect professional for your project or showcase your skills to potential clients.
+            <p className="text-gray-400 max-w-md italic">
+              Where talent meet opportunity
             </p>
           </div>
 
