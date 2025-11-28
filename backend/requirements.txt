@@ -25,7 +25,7 @@ pymongo==4.6.3
 requests==2.32.3
 httpx==0.26.0
 anyio==4.11.0
-typing_extensions==4.12.2
+typing_extensions>=4.8.0
 python-dateutil==2.9.0.post0
 
 # --- OpenAI / LLMs ---
@@ -35,7 +35,7 @@ litellm==1.80.0
 # --- Logging / Debug ---
 rich==13.7.1
 
-# --- Google APIs (if you still use them) ---
+# --- Google APIs (if used) ---
 google-api-python-client==2.129.0
 google-api-core==2.20.0
 google-auth==2.33.0
@@ -44,12 +44,12 @@ googleapis-common-protos==1.63.2
 google-generativeai==0.7.0
 google-genai==1.52.0
 
-# --- AWS SDK (only if needed) ---
+# --- AWS SDK ---
 boto3==1.41.3
 botocore==1.41.3
 
-# --- Required for Uvicorn in Azure ---
+# Required for Uvicorn on Azure
 h11==0.14.0
 
-# --- Gunicorn for Azure App Service ---
+# Gunicorn for Azure App Service
 gunicorn==21.2.0
