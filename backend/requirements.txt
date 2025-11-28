@@ -28,14 +28,14 @@ anyio==4.11.0
 typing_extensions>=4.8.0
 python-dateutil==2.9.0.post0
 
-# --- OpenAI / LLMs ---
-openai==1.40.0
+# --- LLM Support ---
+openai>=1.99.5
 litellm==1.80.0
 
-# --- Logging / Debug ---
+# --- Logging ---
 rich==13.7.1
 
-# --- Google APIs (if used) ---
+# --- Google APIs ---
 google-api-python-client==2.129.0
 google-api-core==2.20.0
 google-auth==2.33.0
