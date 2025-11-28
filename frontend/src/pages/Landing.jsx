@@ -83,20 +83,43 @@ export default function Landing() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
               Find the Perfect
               <span className="text-cyan-600"> Freelancer </span>
-              for Your Project
+              or
+              <span className="text-indigo-600"> Job </span>
             </h1>
             <p className="mt-6 text-lg text-gray-600 max-w-2xl mx-auto">
-              Connect with top professionals in web development, design, writing, and more. 
-              Quality talent at your fingertips.
+              Connect with top professionals or discover exciting opportunities. 
+              Your next project or career move starts here.
             </p>
 
+            {/* Search Type Toggle */}
+            <div className="mt-6 flex justify-center gap-2">
+              <Button
+                variant={searchType === "talent" ? "default" : "outline"}
+                className={searchType === "talent" ? "bg-cyan-600 hover:bg-cyan-700" : ""}
+                onClick={() => setSearchType("talent")}
+                data-testid="search-talent-tab"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Find Talent
+              </Button>
+              <Button
+                variant={searchType === "jobs" ? "default" : "outline"}
+                className={searchType === "jobs" ? "bg-indigo-600 hover:bg-indigo-700" : ""}
+                onClick={() => setSearchType("jobs")}
+                data-testid="search-jobs-tab"
+              >
+                <Briefcase className="h-4 w-4 mr-2" />
+                Find a Job
+              </Button>
+            </div>
+
             {/* Search Bar */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
+            <div className="mt-6 flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
                   type="text"
-                  placeholder="Search for skills or services..."
+                  placeholder={searchType === "talent" ? "Search for skills or services..." : "Search for jobs..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 h-12 text-base"
@@ -104,12 +127,15 @@ export default function Landing() {
                 />
               </div>
               <Button 
-                className="h-12 px-8 bg-cyan-600 hover:bg-cyan-700" 
+                className={`h-12 px-8 ${searchType === "talent" ? "bg-cyan-600 hover:bg-cyan-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
                 asChild
                 data-testid="hero-search-btn"
               >
-                <Link to={`/freelancers${searchQuery ? `?search=${searchQuery}` : ''}`}>
-                  Find Talent
+                <Link to={searchType === "talent" 
+                  ? `/freelancers${searchQuery ? `?search=${searchQuery}` : ''}` 
+                  : `/jobs${searchQuery ? `?search=${searchQuery}` : ''}`
+                }>
+                  {searchType === "talent" ? "Find Talent" : "Find Jobs"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -118,15 +144,26 @@ export default function Landing() {
             {/* Popular searches */}
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <span className="text-gray-500 text-sm">Popular:</span>
-              {["React Developer", "UI Designer", "Content Writer", "Video Editor"].map((term) => (
-                <Link
-                  key={term}
-                  to={`/freelancers?search=${encodeURIComponent(term)}`}
-                  className="text-sm text-cyan-600 hover:text-cyan-700 hover:underline"
-                >
-                  {term}
-                </Link>
-              ))}
+              {searchType === "talent" 
+                ? ["React Developer", "UI Designer", "Content Writer", "Video Editor"].map((term) => (
+                    <Link
+                      key={term}
+                      to={`/freelancers?search=${encodeURIComponent(term)}`}
+                      className="text-sm text-cyan-600 hover:text-cyan-700 hover:underline"
+                    >
+                      {term}
+                    </Link>
+                  ))
+                : ["Web Development", "Mobile App", "Logo Design", "Content Writing"].map((term) => (
+                    <Link
+                      key={term}
+                      to={`/jobs?search=${encodeURIComponent(term)}`}
+                      className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline"
+                    >
+                      {term}
+                    </Link>
+                  ))
+              }
             </div>
           </div>
         </div>
