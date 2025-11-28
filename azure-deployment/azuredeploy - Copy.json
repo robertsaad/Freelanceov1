@@ -19,11 +19,7 @@
     "environment": {
       "type": "string",
       "defaultValue": "test",
-      "allowedValues": [
-        "test",
-        "staging",
-        "production"
-      ],
+      "allowedValues": ["test", "staging", "production"],
       "metadata": {
         "description": "Environment type"
       }
@@ -66,20 +62,13 @@
       "minValue": 400,
       "maxValue": 10000,
       "metadata": {
-        "description": "Cosmos DB throughput (RU/s) at database level"
+        "description": "Cosmos DB throughput (RU/s)"
       }
     },
     "appServicePlanSku": {
       "type": "string",
       "defaultValue": "B1",
-      "allowedValues": [
-        "F1",
-        "B1",
-        "B2",
-        "S1",
-        "S2",
-        "P1v2"
-      ],
+      "allowedValues": ["F1", "B1", "B2", "S1", "S2", "P1v2"],
       "metadata": {
         "description": "App Service Plan SKU"
       }
@@ -122,8 +111,6 @@
         "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
       }
     },
-
-    /* ✅ Cosmos DB Mongo API account (RU-based) */
     {
       "type": "Microsoft.DocumentDB/databaseAccounts",
       "apiVersion": "2023-04-15",
@@ -159,8 +146,6 @@
         }
       }
     },
-
-    /* ✅ Mongo DB (database) with throughput at DB level */
     {
       "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases",
       "apiVersion": "2023-04-15",
@@ -171,14 +156,9 @@
       "properties": {
         "resource": {
           "id": "[variables('cosmosDbDatabaseName')]"
-        },
-        "options": {
-          "throughput": "[parameters('cosmosDbThroughput')]"
         }
       }
     },
-
-    /* ✅ Collections – NO per-collection throughput (reduces metadata 429s) */
     {
       "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
       "apiVersion": "2023-04-15",
@@ -195,6 +175,9 @@
             { "key": { "keys": ["email"] }, "options": { "unique": true } },
             { "key": { "keys": ["role"] } }
           ]
+        },
+        "options": {
+          "throughput": "[parameters('cosmosDbThroughput')]"
         }
       }
     },
@@ -215,6 +198,9 @@
             { "key": { "keys": ["subscription_status", "category", "average_rating"] } },
             { "key": { "keys": ["skills"] } }
           ]
+        },
+        "options": {
+          "throughput": "[parameters('cosmosDbThroughput')]"
         }
       }
     },
@@ -379,7 +365,6 @@
         }
       }
     },
-
     {
       "type": "Microsoft.Web/serverfarms",
       "apiVersion": "2022-03-01",
