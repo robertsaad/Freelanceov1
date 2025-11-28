@@ -1,0 +1,410 @@
+import { useState, useEffect } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { useAuth, API } from "@/App";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import MobileNav from "@/components/MobileNav";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import {
+  MapPin,
+  Clock,
+  DollarSign,
+  Briefcase,
+  Calendar,
+  Globe,
+  MessageSquare,
+  Send,
+  CheckCircle,
+  Users
+} from "lucide-react";
+
+export default function JobDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageContent, setMessageContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [applications, setApplications] = useState([]);
+
+  useEffect(() => {
+    fetchJob();
+    if (user?.role === "freelancer") {
+      checkIfApplied();
+    }
+  }, [id, user]);
+
+  useEffect(() => {
+    if (job && user?.id === job.client_id) {
+      fetchApplications();
+    }
+  }, [job, user]);
+
+  const fetchJob = async () => {
+    try {
+      const response = await axios.get(`${API}/jobs/${id}`);
+      setJob(response.data);
+    } catch (error) {
+      console.error("Error fetching job:", error);
+      toast.error("Job not found");
+      navigate("/jobs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkIfApplied = async () => {
+    try {
+      const response = await axios.get(`${API}/jobs/applications/my`, { withCredentials: true });
+      const applied = response.data.some(app => app.job_id === id);
+      setHasApplied(applied);
+    } catch (error) {
+      // Not logged in or error
+    }
+  };
+
+  const fetchApplications = async () => {
+    try {
+      const response = await axios.get(`${API}/jobs/${id}/applications`, { withCredentials: true });
+      setApplications(response.data);
+    } catch (error) {
+      console.error("Error fetching applications:", error);
+    }
+  };
+
+  const handleApply = async () => {
+    if (!user) {
+      toast.error("Please login to apply");
+      navigate("/login");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await axios.post(`${API}/jobs/${id}/apply`, {}, { withCredentials: true });
+      toast.success("Application submitted! The client will be notified.");
+      setHasApplied(true);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to apply");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!user) {
+      toast.error("Please login to send a message");
+      navigate("/login");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await axios.post(
+        `${API}/messages`,
+        {
+          receiver_id: job.client_id,
+          content: `Regarding your job "${job.title}":\n\n${messageContent}`
+        },
+        { withCredentials: true }
+      );
+      toast.success("Message sent successfully!");
+      setShowMessageModal(false);
+      setMessageContent("");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to send message");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getInitials = (name) => {
+    if (!name) return "C";
+    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  };
+
+  const formatBudget = () => {
+    if (job.budget_min && job.budget_max) {
+      return `$${job.budget_min.toLocaleString()} - $${job.budget_max.toLocaleString()}`;
+    } else if (job.budget_min) {
+      return `From $${job.budget_min.toLocaleString()}`;
+    } else if (job.budget_max) {
+      return `Up to $${job.budget_max.toLocaleString()}`;
+    }
+    return "Budget negotiable";
+  };
+
+  const timeAgo = (dateStr) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now - date;
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (hours < 1) return "Just now";
+    if (hours < 24) return `${hours} hours ago`;
+    if (days < 7) return `${days} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <div className="animate-pulse space-y-6">
+            <div className="h-48 bg-gray-200 rounded-xl" />
+            <div className="h-32 bg-gray-200 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!job) return null;
+
+  const isOwner = user?.id === job.client_id;
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0" data-testid="job-detail-page">
+      <Navbar />
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Main Job Card */}
+        <Card className="mb-6" data-testid="job-card">
+          <CardContent className="p-8">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-start gap-6">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={job.client?.picture} />
+                <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-xl">
+                  {getInitials(job.client?.name)}
+                </AvatarFallback>
+              </Avatar>
+
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Badge className={job.status === "open" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>
+                    {job.status === "open" ? "Open" : job.status}
+                  </Badge>
+                  {job.remote && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                      <Globe className="h-3 w-3 mr-1" />
+                      Remote
+                    </Badge>
+                  )}
+                  <span className="text-gray-500 text-sm">Posted {timeAgo(job.created_at)}</span>
+                </div>
+
+                <h1 className="text-2xl font-bold text-gray-900 mt-3" data-testid="job-title">
+                  {job.title}
+                </h1>
+
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-gray-600">by</span>
+                  <span className="font-medium text-gray-900">{job.client?.name}</span>
+                </div>
+
+                {/* Key Details */}
+                <div className="flex flex-wrap items-center gap-4 mt-4 text-gray-600">
+                  <div className="flex items-center gap-1">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    <span className="font-semibold text-gray-900">{formatBudget()}</span>
+                    <span className="text-sm">({job.budget_type})</span>
+                  </div>
+                  {job.duration && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span>{job.duration}</span>
+                    </div>
+                  )}
+                  {job.location && (
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      <span>{job.location}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <Users className="h-4 w-4" />
+                    <span>{job.applications_count || 0} applicants</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="mt-6 pt-6 border-t">
+              <h2 className="font-semibold text-gray-900 mb-3">Job Description</h2>
+              <p className="text-gray-600 whitespace-pre-wrap" data-testid="job-description">
+                {job.description}
+              </p>
+            </div>
+
+            {/* Skills */}
+            <div className="mt-6">
+              <h2 className="font-semibold text-gray-900 mb-3">Required Skills</h2>
+              <div className="flex flex-wrap gap-2">
+                {job.skills_required?.map((skill, idx) => (
+                  <Badge key={idx} variant="secondary" className="bg-indigo-50 text-indigo-700">
+                    {skill}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            {!isOwner && user?.role === "freelancer" && job.status === "open" && (
+              <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t">
+                {hasApplied ? (
+                  <Button disabled className="bg-green-600">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Applied
+                  </Button>
+                ) : (
+                  <Button 
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                    onClick={handleApply}
+                    disabled={submitting}
+                    data-testid="apply-btn"
+                  >
+                    <Briefcase className="h-4 w-4 mr-2" />
+                    {submitting ? "Applying..." : "Apply Now"}
+                  </Button>
+                )}
+
+                {/* Message Modal */}
+                <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" data-testid="message-btn">
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Message Client
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Send Message to {job.client?.name}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleSendMessage} className="space-y-4">
+                      <Textarea
+                        value={messageContent}
+                        onChange={(e) => setMessageContent(e.target.value)}
+                        rows={5}
+                        placeholder="Introduce yourself and explain why you're a good fit for this job..."
+                        required
+                        data-testid="message-input"
+                      />
+                      <Button 
+                        type="submit" 
+                        className="w-full bg-indigo-600" 
+                        disabled={submitting}
+                        data-testid="send-message-btn"
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        {submitting ? "Sending..." : "Send Message"}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
+
+            {!user && job.status === "open" && (
+              <div className="mt-6 pt-6 border-t">
+                <Button className="bg-indigo-600 hover:bg-indigo-700" asChild>
+                  <Link to="/login">Login to Apply</Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Applications (Owner Only) */}
+        {isOwner && (
+          <Card data-testid="applications-section">
+            <CardHeader>
+              <CardTitle>Applications ({applications.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {applications.length > 0 ? (
+                <div className="space-y-4">
+                  {applications.map((app) => (
+                    <div key={app.id} className="border rounded-lg p-4">
+                      <div className="flex items-start gap-4">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={app.freelancer?.picture} />
+                          <AvatarFallback className="bg-cyan-600 text-white">
+                            {getInitials(app.freelancer?.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <Link 
+                                to={`/freelancers/${app.freelancer_profile?.id}`}
+                                className="font-semibold text-gray-900 hover:text-indigo-600"
+                              >
+                                {app.freelancer?.name}
+                              </Link>
+                              <p className="text-sm text-gray-600">{app.freelancer_profile?.title}</p>
+                            </div>
+                            <span className="text-sm text-gray-500">
+                              {timeAgo(app.created_at)}
+                            </span>
+                          </div>
+                          {app.freelancer_profile && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {app.freelancer_profile.skills?.slice(0, 5).map((skill, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {skill}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex gap-2 mt-3">
+                            <Button size="sm" variant="outline" asChild>
+                              <Link to={`/freelancers/${app.freelancer_profile?.id}`}>
+                                View Profile
+                              </Link>
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                              asChild
+                            >
+                              <Link to={`/dashboard/messages`}>
+                                <MessageSquare className="h-3 w-3 mr-1" />
+                                Message
+                              </Link>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-8">No applications yet</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <MobileNav />
+      <div className="hidden md:block">
+        <Footer />
+      </div>
+    </div>
+  );
+}
