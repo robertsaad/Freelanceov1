@@ -29,7 +29,7 @@ jobs:
           cd frontend
           yarn install --frozen-lockfile
 
-      - name: Build frontend
+      - name: Build app
         run: |
           cd frontend
           yarn build
@@ -42,4 +42,4 @@ jobs:
           action: upload
           app_location: frontend
           output_location: build
-          skip_app_build: true
+          skip_app_build: false
