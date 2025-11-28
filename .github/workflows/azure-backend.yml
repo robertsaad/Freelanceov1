@@ -1,62 +1,53 @@
-name: Build and Deploy Backend
+name: Backend CI/CD
 
 on:
   push:
     branches:
       - main
     paths:
-      - backend/**
+      - "backend/**"
+      - ".github/workflows/azure-backend.yml"
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: windows-latest
 
     defaults:
       run:
-        working-directory: ./backend
+        working-directory: backend
 
     steps:
-      # 1. Checkout
-      - name: Checkout code
-        uses: actions/checkout@v3
+      # 1) Checkout repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # 2. Set up Python
+      # 2) Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      # 3. Install dependencies
+      # 3) Install backend dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. ZIP backend (excluding env + caches)
-      - name: Create deployment ZIP
+      # 4) Create a zip of the backend (excluding venv & caches)
+      - name: Create backend deployment package
         run: |
           $exclude = @("env", "__pycache__", "*.zip")
-          $items = Get-ChildItem -Path . -Recurse | Where-Object { $exclude -notcontains $_.Name }
-          Compress-Archive -Path $items -DestinationPath ../backend.zip -Force
+          $items = Get-ChildItem -Path . -Recurse | Where-Object {
+            ($_.FullName -notlike "*\env\*") -and
+            ($_.FullName -notlike "*\__pycache__\*") -and
+            ($_.Name -notlike "*.zip")
+          }
+          Compress-Archive -Path $items -DestinationPath ..\backend.zip -Force
 
-      # 5. Upload artifact (optional but useful for debugging)
-      - name: Upload backend.zip artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-package
-          path: backend.zip
-
-      # 6. Authenticate to Azure using service principal
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-          subscription-id: "5ca6432a-f2ee-4d7f-b039-b2d1848d0601"
-          allow-no-subscriptions: true
-
-      # 7. Deploy backend.zip to Azure Web App
-      - name: Deploy to Azure App Service
+      # 5) Deploy to Azure Web App using publish profile
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
-          app-name: "freelancehub-api-edubw3ephznye"
-          package: "backend.zip"
+          app-name: freelancehub-api-edubw3ephznye
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: backend.zip
