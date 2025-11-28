@@ -15,24 +15,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        working-directory: backend
+        working-directory: ./backend
         run: |
           python -m venv env
           .\env\Scripts\activate
           pip install -r requirements.txt
 
-      - name: Zip backend
+      - name: Zip backend code
+        working-directory: ./backend
         run: |
-          Compress-Archive -Path backend\* -DestinationPath backend.zip -Force
+          powershell -Command "Compress-Archive -Path * -DestinationPath ../backend.zip -Force"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload artifact   # UPDATED
+        uses: actions/upload-artifact@v4
         with:
           name: backend.zip
           path: backend.zip
@@ -42,8 +43,8 @@ jobs:
     needs: build
 
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v3
+      - name: Download artifact   # UPDATED
+        uses: actions/download-artifact@v4
         with:
           name: backend.zip
           path: .
