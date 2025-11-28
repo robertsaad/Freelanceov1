@@ -260,6 +260,50 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Featured Jobs Section */}
+      <section className="py-16 bg-gray-50" data-testid="featured-jobs-section">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-10">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900">Latest Job Opportunities</h2>
+              <p className="mt-2 text-gray-600">Find your next project</p>
+            </div>
+            <Button variant="outline" asChild className="hidden sm:flex">
+              <Link to="/jobs">
+                View All Jobs
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+
+          {featuredJobs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredJobs.map((job) => (
+                <JobCard key={job.id} job={job} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-white rounded-xl">
+              <Briefcase className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900">No jobs posted yet</h3>
+              <p className="text-gray-500 mt-1">Be the first to post a job!</p>
+              <Button className="mt-4 bg-indigo-600 hover:bg-indigo-700" asChild>
+                <Link to="/register">Post a Job</Link>
+              </Button>
+            </div>
+          )}
+
+          <div className="text-center mt-8 sm:hidden">
+            <Button variant="outline" asChild>
+              <Link to="/jobs">
+                View All Jobs
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-br from-cyan-600 to-indigo-600" data-testid="cta-section">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
