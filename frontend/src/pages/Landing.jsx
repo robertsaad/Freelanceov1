@@ -43,10 +43,13 @@ const stats = [
 export default function Landing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [featuredFreelancers, setFeaturedFreelancers] = useState([]);
+  const [featuredJobs, setFeaturedJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchType, setSearchType] = useState("talent"); // talent or jobs
 
   useEffect(() => {
     fetchFeaturedFreelancers();
+    fetchFeaturedJobs();
   }, []);
 
   const fetchFeaturedFreelancers = async () => {
@@ -57,6 +60,15 @@ export default function Landing() {
       console.error("Error fetching featured freelancers:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFeaturedJobs = async () => {
+    try {
+      const response = await axios.get(`${API}/jobs/featured`);
+      setFeaturedJobs(response.data);
+    } catch (error) {
+      console.error("Error fetching featured jobs:", error);
     }
   };
 
