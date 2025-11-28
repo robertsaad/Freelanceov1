@@ -20,17 +20,23 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install dependencies (backend)
+        shell: pwsh
         run: |
+          Write-Host "Entering backend directory..."
           cd backend
+          
+          Write-Host "Creating venv..."
           python -m venv env
+          
+          Write-Host "Activating venv..."
           .\env\Scripts\activate
+
+          Write-Host "Installing requirements..."
           pip install -r requirements.txt
 
-      - name: Zip backend
-        run: |
-          cd backend
-          powershell Compress-Archive -Path * -DestinationPath ../backend.zip
+          Write-Host "Zipping backend..."
+          Compress-Archive -Path * -DestinationPath ../backend.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
