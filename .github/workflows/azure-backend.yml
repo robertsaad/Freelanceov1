@@ -16,43 +16,28 @@ jobs:
         working-directory: ./backend
 
     steps:
-      # -------------------------------------------------------
-      # 1. Checkout code
-      # -------------------------------------------------------
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # -------------------------------------------------------
-      # 2. Set up Python
-      # -------------------------------------------------------
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # -------------------------------------------------------
-      # 3. Install dependencies (NO venv created here)
-      # -------------------------------------------------------
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # -------------------------------------------------------
-      # 4. Create zip WITHOUT venv / cache folders
-      # -------------------------------------------------------
-      - name: Zip backend code (exclude venv, __pycache__)
+      - name: Zip backend code
         run: |
-          # Collect everything except env + caches
-          $items = Get-ChildItem -Path . -Exclude env, __pycache__, *.zip
+          $exclude = @("env", "__pycache__", "*.zip")
+          $items = Get-ChildItem -Path . -Exclude $exclude
           Compress-Archive -Path $items -DestinationPath ../backend.zip -Force
 
-      # -------------------------------------------------------
-      # 5. Upload zip artifact for deployment
-      # -------------------------------------------------------
-      - name: Upload backend.zip artifact
+      - name: Upload backend artifact
         uses: actions/upload-artifact@v4
         with:
-          name: backend.zip
+          name: backend-zip
           path: backend.zip
-          compression-level: 0    # Faster upload, Azure doesn't need extra compression
+          compression-level: 0
