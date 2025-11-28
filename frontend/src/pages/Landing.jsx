@@ -4,6 +4,7 @@ import axios from "axios";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FreelancerCard from "@/components/FreelancerCard";
+import JobCard from "@/components/JobCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { API } from "@/App";
@@ -19,7 +20,8 @@ import {
   CheckCircle,
   Users,
   Award,
-  Globe
+  Globe,
+  Briefcase
 } from "lucide-react";
 
 const categories = [
