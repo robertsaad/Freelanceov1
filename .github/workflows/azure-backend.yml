@@ -15,9 +15,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set working directory
-        run: echo "BACKEND_DIR=backend" >> $GITHUB_ENV
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -30,7 +27,7 @@ jobs:
           source env/bin/activate
           pip install -r requirements.txt
 
-      - name: Zip backend code
+      - name: Zip backend
         working-directory: backend
         run: zip -r ../backend.zip .
 
