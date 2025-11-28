@@ -1,4 +1,4 @@
-name: Build and deploy backend
+name: Build and Deploy Backend
 
 on:
   push:
@@ -6,7 +6,6 @@ on:
       - main
     paths:
       - backend/**
-      - .github/workflows/azure-backend.yml
 
 jobs:
   build:
@@ -17,27 +16,47 @@ jobs:
         working-directory: ./backend
 
     steps:
+      # 1. Checkout
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
+      # 2. Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
+      # 3. Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Zip backend code
+      # 4. ZIP backend (excluding env + caches)
+      - name: Create deployment ZIP
         run: |
           $exclude = @("env", "__pycache__", "*.zip")
           $items = Get-ChildItem -Path . -Recurse | Where-Object { $exclude -notcontains $_.Name }
-          Compress-Archive -Path $items -DestinationPath ../backend-package.zip -Force
+          Compress-Archive -Path $items -DestinationPath ../backend.zip -Force
 
-      - name: Upload backend package
+      # 5. Upload artifact (optional but useful for debugging)
+      - name: Upload backend.zip artifact
         uses: actions/upload-artifact@v4
         with:
           name: backend-package
-          path: backend-package.zip
+          path: backend.zip
+
+      # 6. Authenticate to Azure using service principal
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          subscription-id: "5ca6432a-f2ee-4d7f-b039-b2d1848d0601"
+          allow-no-subscriptions: true
+
+      # 7. Deploy backend.zip to Azure Web App
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: "freelancehub-api-edubw3ephznye"
+          package: "backend.zip"
