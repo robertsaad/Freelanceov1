@@ -133,6 +133,32 @@ class CheckoutRequest(BaseModel):
     package_type: str  # monthly or yearly
     origin_url: str
 
+# Job Posting Models
+class JobPostCreate(BaseModel):
+    title: str
+    description: str
+    category: str
+    skills_required: List[str]
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    budget_type: str = "fixed"  # fixed, hourly
+    duration: Optional[str] = None  # e.g., "1-2 weeks", "1-3 months"
+    location: Optional[str] = None
+    remote: bool = True
+
+class JobPostUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    skills_required: Optional[List[str]] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    budget_type: Optional[str] = None
+    duration: Optional[str] = None
+    location: Optional[str] = None
+    remote: Optional[bool] = None
+    status: Optional[str] = None  # open, closed, filled
+
 # ==================== AUTH HELPERS ====================
 
 def hash_password(password: str) -> str:
