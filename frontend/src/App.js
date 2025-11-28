@@ -222,6 +222,16 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/jobs" element={<JobsList />} />
+      <Route path="/jobs/:id" element={<JobDetail />} />
+      <Route
+        path="/jobs/post"
+        element={
+          <ProtectedRoute roles={["client"]}>
+            <PostJob />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
