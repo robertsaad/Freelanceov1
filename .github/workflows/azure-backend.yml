@@ -6,55 +6,53 @@ on:
       - main
     paths:
       - backend/**
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
+
     defaults:
       run:
         working-directory: ./backend
 
     steps:
+      # -------------------------------------------------------
+      # 1. Checkout code
+      # -------------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # -------------------------------------------------------
+      # 2. Set up Python
+      # -------------------------------------------------------
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
+      # -------------------------------------------------------
+      # 3. Install dependencies (NO venv created here)
+      # -------------------------------------------------------
       - name: Install dependencies
         run: |
-          python -m venv env
-          .\env\Scripts\activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Zip backend code
-        run: powershell -command "Compress-Archive -Path * -DestinationPath ../backend.zip -Force"
+      # -------------------------------------------------------
+      # 4. Create zip WITHOUT venv / cache folders
+      # -------------------------------------------------------
+      - name: Zip backend code (exclude venv, __pycache__)
+        run: |
+          # Collect everything except env + caches
+          $items = Get-ChildItem -Path . -Exclude env, __pycache__, *.zip
+          Compress-Archive -Path $items -DestinationPath ../backend.zip -Force
 
-      - name: Upload artifact
+      # -------------------------------------------------------
+      # 5. Upload zip artifact for deployment
+      # -------------------------------------------------------
+      - name: Upload backend.zip artifact
         uses: actions/upload-artifact@v4
         with:
           name: backend.zip
           path: backend.zip
-
-  deploy:
-    runs-on: windows-latest
-    needs: build
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: backend.zip
-          path: .
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: freelancerhub-api-edubw3ephznye
-          slot-name: Production
-          package: backend.zip
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          compression-level: 0    # Faster upload, Azure doesn't need extra compression
