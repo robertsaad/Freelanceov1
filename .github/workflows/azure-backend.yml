@@ -13,7 +13,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./backend
+        working-directory: backend
 
     steps:
       - name: Checkout code
@@ -32,7 +32,7 @@ jobs:
       - name: Zip backend code
         run: |
           $exclude = @("env", "__pycache__", "*.zip")
-          $items = Get-ChildItem -Path . -Exclude $exclude
+          $items = Get-ChildItem -Exclude $exclude
           Compress-Archive -Path $items -DestinationPath ../backend.zip -Force
 
       - name: Upload backend artifact
