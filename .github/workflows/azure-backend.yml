@@ -11,34 +11,34 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: backend   # 👈 VERY IMPORTANT
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Set working directory
+        run: echo "BACKEND_DIR=backend" >> $GITHUB_ENV
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
+        working-directory: backend
         run: |
           python -m venv env
           source env/bin/activate
           pip install -r requirements.txt
 
-      - name: Zip backend
-        run: |
-          zip -r backend.zip .
+      - name: Zip backend code
+        working-directory: backend
+        run: zip -r ../backend.zip .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
           name: backend.zip
-          path: backend/backend.zip
+          path: backend.zip
 
   deploy:
     runs-on: ubuntu-latest
