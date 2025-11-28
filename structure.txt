@@ -1,0 +1,140 @@
+Folder PATH listing for volume Local Disk
+Volume serial number is 00000285 98E3:3BF1
+C:.
+¦   .gitignore
+¦   plan.md
+¦   README.md
+¦   structure.txt
+¦   
++---.github
+¦   ¦   DEPLOYMENT_GUIDE.md
+¦   ¦   
+¦   +---workflows
+¦           azure-backend.yml
+¦           azure-backendold.yml
+¦           azure-frontend.yml
+¦           azure-static-web-apps-green-cliff-0164cf910.yml
+¦           main_freelancehub-api-edubw3ephznye.yml
+¦           
++---azure-deployment
+¦       azuredeploy - Copy.json
+¦       azuredeploy.json
+¦       azuredeploy.parameters.json
+¦       deploy.sh
+¦       README.md
+¦       
++---backend
+¦       .env.example
+¦       requirements.txt
+¦       server.py
+¦       
++---frontend
+¦   ¦   .env.example
+¦   ¦   .gitignore
+¦   ¦   capacitor.config.json
+¦   ¦   components.json
+¦   ¦   craco.config.js
+¦   ¦   jsconfig.json
+¦   ¦   package.json
+¦   ¦   postcss.config.js
+¦   ¦   README.md
+¦   ¦   tailwind.config.js
+¦   ¦   yarn.lock
+¦   ¦   
+¦   +---plugins
+¦   ¦   +---health-check
+¦   ¦   ¦       health-endpoints.js
+¦   ¦   ¦       webpack-health-plugin.js
+¦   ¦   ¦       
+¦   ¦   +---visual-edits
+¦   ¦           babel-metadata-plugin.js
+¦   ¦           dev-server-setup.js
+¦   ¦           
+¦   +---public
+¦   ¦       index.html
+¦   ¦       
+¦   +---src
+¦       ¦   App.css
+¦       ¦   App.js
+¦       ¦   index.css
+¦       ¦   index.js
+¦       ¦   
+¦       +---components
+¦       ¦   ¦   Footer.jsx
+¦       ¦   ¦   FreelancerCard.jsx
+¦       ¦   ¦   MobileNav.jsx
+¦       ¦   ¦   Navbar.jsx
+¦       ¦   ¦   StarRating.jsx
+¦       ¦   ¦   
+¦       ¦   +---ui
+¦       ¦           accordion.jsx
+¦       ¦           alert-dialog.jsx
+¦       ¦           alert.jsx
+¦       ¦           aspect-ratio.jsx
+¦       ¦           avatar.jsx
+¦       ¦           badge.jsx
+¦       ¦           breadcrumb.jsx
+¦       ¦           button.jsx
+¦       ¦           calendar.jsx
+¦       ¦           card.jsx
+¦       ¦           carousel.jsx
+¦       ¦           checkbox.jsx
+¦       ¦           collapsible.jsx
+¦       ¦           command.jsx
+¦       ¦           context-menu.jsx
+¦       ¦           dialog.jsx
+¦       ¦           drawer.jsx
+¦       ¦           dropdown-menu.jsx
+¦       ¦           form.jsx
+¦       ¦           hover-card.jsx
+¦       ¦           input-otp.jsx
+¦       ¦           input.jsx
+¦       ¦           label.jsx
+¦       ¦           menubar.jsx
+¦       ¦           navigation-menu.jsx
+¦       ¦           pagination.jsx
+¦       ¦           popover.jsx
+¦       ¦           progress.jsx
+¦       ¦           radio-group.jsx
+¦       ¦           resizable.jsx
+¦       ¦           scroll-area.jsx
+¦       ¦           select.jsx
+¦       ¦           separator.jsx
+¦       ¦           sheet.jsx
+¦       ¦           skeleton.jsx
+¦       ¦           slider.jsx
+¦       ¦           sonner.jsx
+¦       ¦           switch.jsx
+¦       ¦           table.jsx
+¦       ¦           tabs.jsx
+¦       ¦           textarea.jsx
+¦       ¦           toast.jsx
+¦       ¦           toaster.jsx
+¦       ¦           toggle-group.jsx
+¦       ¦           toggle.jsx
+¦       ¦           tooltip.jsx
+¦       ¦           
+¦       +---hooks
+¦       ¦       use-toast.js
+¦       ¦       
+¦       +---lib
+¦       ¦       utils.js
+¦       ¦       
+¦       +---pages
+¦               Dashboard.jsx
+¦               EditProfile.jsx
+¦               Feed.jsx
+¦               FreelancerProfile.jsx
+¦               FreelancersList.jsx
+¦               HiringRequests.jsx
+¦               Landing.jsx
+¦               Login.jsx
+¦               Messages.jsx
+¦               Notifications.jsx
+¦               PaymentSuccess.jsx
+¦               Pricing.jsx
+¦               Register.jsx
+¦               
++---tests
+        __init__.py
+        

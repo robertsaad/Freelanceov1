@@ -6,15 +6,18 @@ on:
       - main
     paths:
       - backend/**
-      - .github/workflows/azure-backend.yml   # allow workflow to run when edited
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ./backend
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -22,17 +25,14 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        working-directory: ./backend
         run: |
           python -m venv env
           .\env\Scripts\activate
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Zip backend code
-        working-directory: ./backend
-        run: |
-          powershell -command "Compress-Archive -Path * -DestinationPath ../backend.zip -Force"
+        run: powershell -command "Compress-Archive -Path * -DestinationPath ../backend.zip -Force"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -52,8 +52,9 @@ jobs:
           path: .
 
       - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
+        uses: azure/webapps-deploy@v3
         with:
-          app-name: freelancehub-api-edubw3ephznye
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          app-name: freelancerhub-api-edubw3ephznye
+          slot-name: Production
           package: backend.zip
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
