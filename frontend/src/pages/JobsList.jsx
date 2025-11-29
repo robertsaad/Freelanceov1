@@ -114,9 +114,53 @@ export default function JobsList() {
     setSearchParams(newParams);
   };
 
+  // Redirect clients to freelancers page
+  useEffect(() => {
+    if (user?.role === "client") {
+      navigate("/freelancers");
+      toast.info("Clients can browse talent, not jobs. Redirecting...");
+    }
+  }, [user, navigate]);
+
+  if (accessDenied || user?.role === "client") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+          <AlertCircle className="h-16 w-16 mx-auto text-red-600 mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Restricted</h1>
+          <p className="text-gray-600 mb-6">
+            Clients cannot browse job listings. You can post jobs and browse talent instead.
+          </p>
+          <Button className="bg-cyan-600 hover:bg-cyan-700" asChild>
+            <Link to="/freelancers">Browse Talent</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0" data-testid="jobs-list-page">
       <Navbar />
+
+      {/* Subscription Banner for non-subscribed freelancers */}
+      {requiresSubscription && user?.role === "freelancer" && (
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Lock className="h-6 w-6" />
+              <div>
+                <p className="font-semibold">Unlock Full Job Details</p>
+                <p className="text-sm text-indigo-100">Subscribe to view complete job descriptions, budgets, and client information</p>
+              </div>
+            </div>
+            <Button variant="secondary" asChild>
+              <Link to="/pricing">View Plans</Link>
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-white border-b">
