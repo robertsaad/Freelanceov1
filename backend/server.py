@@ -1463,12 +1463,52 @@ async def get_job_categories():
     return [{"name": r["_id"], "count": r["count"]} for r in results if r["_id"]]
 
 @api_router.get("/jobs/{job_id}")
-async def get_job(job_id: str):
-    """Get a single job posting"""
+async def get_job(job_id: str, request: Request):
+    """Get a single job posting - freelancers need subscription for full details"""
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
+    # Check if user is authenticated
+    try:
+        user = await require_auth(request)
+        user_role = user["role"]
+        
+        # Clients should not access job details (they post jobs, not view them)
+        if user_role == "client":
+            raise HTTPException(status_code=403, detail="Clients cannot view job details")
+        
+        # Check if freelancer has active subscription
+        if user_role == "freelancer":
+            profile = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+            has_subscription = profile and profile.get("subscription_status") == "active"
+            
+            if not has_subscription:
+                # Return limited job info for non-subscribed freelancers
+                return {
+                    "id": job["id"],
+                    "title": job["title"],
+                    "category": job.get("category"),
+                    "budget_type": job.get("budget_type"),
+                    "created_at": job.get("created_at"),
+                    "remote": job.get("remote"),
+                    "requires_subscription": True,
+                    "preview_only": True
+                }
+    except HTTPException as e:
+        # Not authenticated - return limited preview
+        return {
+            "id": job["id"],
+            "title": job["title"],
+            "category": job.get("category"),
+            "budget_type": job.get("budget_type"),
+            "created_at": job.get("created_at"),
+            "remote": job.get("remote"),
+            "requires_subscription": True,
+            "preview_only": True
+        }
+    
+    # Full access for subscribed freelancers
     client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
     if client:
         job["client"] = client
