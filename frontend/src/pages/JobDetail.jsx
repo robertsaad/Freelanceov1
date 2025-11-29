@@ -52,12 +52,22 @@ export default function JobDetail() {
 
   const fetchJob = async () => {
     try {
-      const response = await axios.get(`${API}/jobs/${id}`);
+      const response = await axios.get(`${API}/jobs/${id}`, { withCredentials: true });
       setJob(response.data);
+      
+      // If it's preview only, show a toast
+      if (response.data.preview_only) {
+        toast.info("Subscribe to view full job details and apply");
+      }
     } catch (error) {
       console.error("Error fetching job:", error);
-      toast.error("Job not found");
-      navigate("/jobs");
+      if (error.response?.status === 403) {
+        toast.error("Access denied. Clients cannot view job details.");
+        navigate("/freelancers");
+      } else {
+        toast.error("Job not found");
+        navigate("/jobs");
+      }
     } finally {
       setLoading(false);
     }
