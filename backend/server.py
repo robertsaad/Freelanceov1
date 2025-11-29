@@ -1371,6 +1371,7 @@ async def create_job(data: JobPostCreate, request: Request):
 
 @api_router.get("/jobs")
 async def list_jobs(
+    request: Request,
     category: Optional[str] = None,
     skills: Optional[str] = None,
     budget_min: Optional[float] = None,
@@ -1380,7 +1381,29 @@ async def list_jobs(
     page: int = 1,
     limit: int = 12
 ):
-    """List all open job postings with filters"""
+    """List all open job postings with filters - clients cannot access this"""
+    # Check if user is authenticated and their role
+    user_role = None
+    has_subscription = False
+    
+    try:
+        user = await require_auth(request)
+        user_role = user["role"]
+        
+        # Clients should not see job listings at all
+        if user_role == "client":
+            raise HTTPException(status_code=403, detail="Clients cannot browse jobs. Please visit the talent marketplace instead.")
+        
+        # Check freelancer subscription status
+        if user_role == "freelancer":
+            profile = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+            has_subscription = profile and profile.get("subscription_status") == "active"
+    except HTTPException as e:
+        if e.status_code == 403:
+            raise e
+        # Not authenticated - allow browsing with limited preview
+        pass
+    
     query = {"status": "open"}
     
     if category:
@@ -1411,7 +1434,30 @@ async def list_jobs(
     jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
     total = await db.jobs.count_documents(query)
     
-    # Get client info for each job
+    # Return limited or full info based on subscription
+    if not has_subscription:
+        # Limited preview for non-subscribed users
+        limited_jobs = []
+        for job in jobs:
+            limited_jobs.append({
+                "id": job["id"],
+                "title": job["title"],
+                "category": job.get("category"),
+                "budget_type": job.get("budget_type"),
+                "created_at": job.get("created_at"),
+                "remote": job.get("remote"),
+                "skills_required": job.get("skills_required", []),
+                "preview_only": True
+            })
+        return {
+            "jobs": limited_jobs,
+            "total": total,
+            "page": page,
+            "pages": (total + limit - 1) // limit,
+            "requires_subscription": True
+        }
+    
+    # Full access for subscribed freelancers
     for job in jobs:
         client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
         if client:
