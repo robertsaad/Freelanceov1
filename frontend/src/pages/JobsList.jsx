@@ -29,11 +29,14 @@ const categories = [
 
 export default function JobsList() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [requiresSubscription, setRequiresSubscription] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   const search = searchParams.get("search") || "";
   const category = searchParams.get("category") || "";
@@ -42,10 +45,11 @@ export default function JobsList() {
 
   useEffect(() => {
     fetchJobs();
-  }, [search, category, remoteOnly, page]);
+  }, [search, category, remoteOnly, page, user]);
 
   const fetchJobs = async () => {
     setLoading(true);
+    setAccessDenied(false);
     try {
       const params = new URLSearchParams();
       if (search) params.append("search", search);
@@ -54,12 +58,17 @@ export default function JobsList() {
       params.append("page", page.toString());
       params.append("limit", "12");
 
-      const response = await axios.get(`${API}/jobs?${params.toString()}`);
+      const response = await axios.get(`${API}/jobs?${params.toString()}`, { withCredentials: true });
       setJobs(response.data.jobs);
       setTotalPages(response.data.pages);
       setTotal(response.data.total);
+      setRequiresSubscription(response.data.requires_subscription || false);
     } catch (error) {
       console.error("Error fetching jobs:", error);
+      if (error.response?.status === 403) {
+        setAccessDenied(true);
+        toast.error("Clients cannot browse jobs. Please visit the talent marketplace instead.");
+      }
     } finally {
       setLoading(false);
     }
