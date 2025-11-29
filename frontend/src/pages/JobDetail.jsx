@@ -185,6 +185,81 @@ export default function JobDetail() {
   if (!job) return null;
 
   const isOwner = user?.id === job.client_id;
+  const isPreviewOnly = job.preview_only;
+
+  // Show subscription prompt for preview-only access
+  if (isPreviewOnly) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+        <Navbar />
+        
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Preview Card */}
+          <Card className="mb-6 border-2 border-yellow-200">
+            <CardContent className="p-8">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center">
+                  <Lock className="h-6 w-6 text-yellow-600" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">Limited Preview</h2>
+                  <p className="text-gray-600">You're viewing a limited preview of this job. Subscribe to unlock full details.</p>
+                </div>
+              </div>
+
+              <h1 className="text-2xl font-bold text-gray-900 mb-4">{job.title}</h1>
+              
+              <div className="flex flex-wrap gap-3 mb-6">
+                {job.category && (
+                  <Badge variant="secondary">{job.category}</Badge>
+                )}
+                {job.remote && (
+                  <Badge className="bg-green-100 text-green-700">Remote</Badge>
+                )}
+                {job.budget_type && (
+                  <Badge variant="outline">{job.budget_type === "hourly" ? "Hourly Rate" : "Fixed Price"}</Badge>
+                )}
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <h3 className="font-semibold text-gray-900 mb-3">What's Locked:</h3>
+                <ul className="space-y-2 text-gray-600">
+                  <li className="flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-gray-400" />
+                    Full job description and requirements
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-gray-400" />
+                    Budget and compensation details
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-gray-400" />
+                    Client information and contact
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-gray-400" />
+                    Ability to apply for this job
+                  </li>
+                </ul>
+              </div>
+
+              <div className="flex gap-4">
+                <Button className="bg-indigo-600 hover:bg-indigo-700 flex-1" asChild>
+                  <Link to="/pricing">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Subscribe to Apply
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link to="/jobs">Browse More Jobs</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0" data-testid="job-detail-page">
