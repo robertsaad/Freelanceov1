@@ -145,16 +145,17 @@ export default function Navbar() {
                 )}
               </div>
 
-              {/* Find Work Dropdown */}
-              <div 
-                className="relative"
-                onMouseEnter={() => setFindWorkOpen(true)}
-                onMouseLeave={() => setFindWorkOpen(false)}
-              >
-                <button className="flex items-center gap-1 text-gray-700 hover:text-cyan-600 font-medium transition-colors py-2">
-                  Find Work
-                  <ChevronDown className="h-4 w-4" />
-                </button>
+              {/* Find Work Dropdown - Only for non-clients */}
+              {user?.role !== "client" && (
+                <div 
+                  className="relative"
+                  onMouseEnter={() => setFindWorkOpen(true)}
+                  onMouseLeave={() => setFindWorkOpen(false)}
+                >
+                  <button className="flex items-center gap-1 text-gray-700 hover:text-cyan-600 font-medium transition-colors py-2">
+                    Find Work
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
                 
                 {findWorkOpen && (
                   <div className="absolute left-0 top-full pt-2 w-96">
