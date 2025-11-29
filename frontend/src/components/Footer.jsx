@@ -13,7 +13,7 @@ export default function Footer() {
               <span className="text-xl font-bold">Freelanceo</span>
             </div>
             <p className="text-gray-400 max-w-md italic">
-              Where talent meet opportunity
+              Where talent meets opportunity
             </p>
           </div>
 
