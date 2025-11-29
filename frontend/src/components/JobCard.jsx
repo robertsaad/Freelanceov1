@@ -2,15 +2,20 @@ import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MapPin, Clock, DollarSign, Briefcase } from "lucide-react";
+import { MapPin, Clock, DollarSign, Briefcase, Lock } from "lucide-react";
 
 export default function JobCard({ job }) {
+  const isPreviewOnly = job.preview_only;
+
   const getInitials = (name) => {
     if (!name) return "C";
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
   const formatBudget = () => {
+    if (isPreviewOnly) {
+      return job.budget_type === "hourly" ? "Hourly Rate" : "Fixed Price";
+    }
     if (job.budget_min && job.budget_max) {
       return `$${job.budget_min.toLocaleString()} - $${job.budget_max.toLocaleString()}`;
     } else if (job.budget_min) {
