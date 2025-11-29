@@ -19,6 +19,9 @@ import Pricing from "@/pages/Pricing";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import Feed from "@/pages/Feed";
 import Notifications from "@/pages/Notifications";
+import JobsList from "@/pages/JobsList";
+import JobDetail from "@/pages/JobDetail";
+import PostJob from "@/pages/PostJob";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -216,6 +219,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <HiringRequests />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/jobs" element={<JobsList />} />
+      <Route path="/jobs/:id" element={<JobDetail />} />
+      <Route
+        path="/jobs/post"
+        element={
+          <ProtectedRoute roles={["client"]}>
+            <PostJob />
           </ProtectedRoute>
         }
       />

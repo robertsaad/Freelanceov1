@@ -4,6 +4,7 @@ import axios from "axios";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FreelancerCard from "@/components/FreelancerCard";
+import JobCard from "@/components/JobCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { API } from "@/App";
@@ -19,7 +20,8 @@ import {
   CheckCircle,
   Users,
   Award,
-  Globe
+  Globe,
+  Briefcase
 } from "lucide-react";
 
 const categories = [
@@ -41,10 +43,13 @@ const stats = [
 export default function Landing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [featuredFreelancers, setFeaturedFreelancers] = useState([]);
+  const [featuredJobs, setFeaturedJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchType, setSearchType] = useState("talent"); // talent or jobs
 
   useEffect(() => {
     fetchFeaturedFreelancers();
+    fetchFeaturedJobs();
   }, []);
 
   const fetchFeaturedFreelancers = async () => {
@@ -55,6 +60,15 @@ export default function Landing() {
       console.error("Error fetching featured freelancers:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchFeaturedJobs = async () => {
+    try {
+      const response = await axios.get(`${API}/jobs/featured`);
+      setFeaturedJobs(response.data);
+    } catch (error) {
+      console.error("Error fetching featured jobs:", error);
     }
   };
 
@@ -69,20 +83,43 @@ export default function Landing() {
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
               Find the Perfect
               <span className="text-cyan-600"> Freelancer </span>
-              for Your Project
+              or
+              <span className="text-indigo-600"> Job </span>
             </h1>
             <p className="mt-6 text-lg text-gray-600 max-w-2xl mx-auto">
-              Connect with top professionals in web development, design, writing, and more. 
-              Quality talent at your fingertips.
+              Connect with top professionals or discover exciting opportunities. 
+              Your next project or career move starts here.
             </p>
 
+            {/* Search Type Toggle */}
+            <div className="mt-6 flex justify-center gap-2">
+              <Button
+                variant={searchType === "talent" ? "default" : "outline"}
+                className={searchType === "talent" ? "bg-cyan-600 hover:bg-cyan-700" : ""}
+                onClick={() => setSearchType("talent")}
+                data-testid="search-talent-tab"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Find Talent
+              </Button>
+              <Button
+                variant={searchType === "jobs" ? "default" : "outline"}
+                className={searchType === "jobs" ? "bg-indigo-600 hover:bg-indigo-700" : ""}
+                onClick={() => setSearchType("jobs")}
+                data-testid="search-jobs-tab"
+              >
+                <Briefcase className="h-4 w-4 mr-2" />
+                Find a Job
+              </Button>
+            </div>
+
             {/* Search Bar */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
+            <div className="mt-6 flex flex-col sm:flex-row gap-3 max-w-xl mx-auto">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
                   type="text"
-                  placeholder="Search for skills or services..."
+                  placeholder={searchType === "talent" ? "Search for skills or services..." : "Search for jobs..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 h-12 text-base"
@@ -90,12 +127,15 @@ export default function Landing() {
                 />
               </div>
               <Button 
-                className="h-12 px-8 bg-cyan-600 hover:bg-cyan-700" 
+                className={`h-12 px-8 ${searchType === "talent" ? "bg-cyan-600 hover:bg-cyan-700" : "bg-indigo-600 hover:bg-indigo-700"}`}
                 asChild
                 data-testid="hero-search-btn"
               >
-                <Link to={`/freelancers${searchQuery ? `?search=${searchQuery}` : ''}`}>
-                  Find Talent
+                <Link to={searchType === "talent" 
+                  ? `/freelancers${searchQuery ? `?search=${searchQuery}` : ''}` 
+                  : `/jobs${searchQuery ? `?search=${searchQuery}` : ''}`
+                }>
+                  {searchType === "talent" ? "Find Talent" : "Find Jobs"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -104,15 +144,26 @@ export default function Landing() {
             {/* Popular searches */}
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <span className="text-gray-500 text-sm">Popular:</span>
-              {["React Developer", "UI Designer", "Content Writer", "Video Editor"].map((term) => (
-                <Link
-                  key={term}
-                  to={`/freelancers?search=${encodeURIComponent(term)}`}
-                  className="text-sm text-cyan-600 hover:text-cyan-700 hover:underline"
-                >
-                  {term}
-                </Link>
-              ))}
+              {searchType === "talent" 
+                ? ["React Developer", "UI Designer", "Content Writer", "Video Editor"].map((term) => (
+                    <Link
+                      key={term}
+                      to={`/freelancers?search=${encodeURIComponent(term)}`}
+                      className="text-sm text-cyan-600 hover:text-cyan-700 hover:underline"
+                    >
+                      {term}
+                    </Link>
+                  ))
+                : ["Web Development", "Mobile App", "Logo Design", "Content Writing"].map((term) => (
+                    <Link
+                      key={term}
+                      to={`/jobs?search=${encodeURIComponent(term)}`}
+                      className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline"
+                    >
+                      {term}
+                    </Link>
+                  ))
+              }
             </div>
           </div>
         </div>
@@ -209,6 +260,50 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Featured Jobs Section */}
+      <section className="py-16 bg-gray-50" data-testid="featured-jobs-section">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between mb-10">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900">Latest Job Opportunities</h2>
+              <p className="mt-2 text-gray-600">Find your next project</p>
+            </div>
+            <Button variant="outline" asChild className="hidden sm:flex">
+              <Link to="/jobs">
+                View All Jobs
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+
+          {featuredJobs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredJobs.map((job) => (
+                <JobCard key={job.id} job={job} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-white rounded-xl">
+              <Briefcase className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900">No jobs posted yet</h3>
+              <p className="text-gray-500 mt-1">Be the first to post a job!</p>
+              <Button className="mt-4 bg-indigo-600 hover:bg-indigo-700" asChild>
+                <Link to="/register">Post a Job</Link>
+              </Button>
+            </div>
+          )}
+
+          <div className="text-center mt-8 sm:hidden">
+            <Button variant="outline" asChild>
+              <Link to="/jobs">
+                View All Jobs
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-br from-cyan-600 to-indigo-600" data-testid="cta-section">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -216,7 +311,7 @@ export default function Landing() {
             Ready to Start Your Freelance Journey?
           </h2>
           <p className="text-xl text-cyan-100 mb-8">
-            Join thousands of professionals who have grown their careers with FreelanceHub.
+            Join thousands of professionals who have grown their careers with Freelanceo.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" className="bg-white text-cyan-600 hover:bg-gray-100" asChild>

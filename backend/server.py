@@ -133,6 +133,32 @@ class CheckoutRequest(BaseModel):
     package_type: str  # monthly or yearly
     origin_url: str
 
+# Job Posting Models
+class JobPostCreate(BaseModel):
+    title: str
+    description: str
+    category: str
+    skills_required: List[str]
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    budget_type: str = "fixed"  # fixed, hourly
+    duration: Optional[str] = None  # e.g., "1-2 weeks", "1-3 months"
+    location: Optional[str] = None
+    remote: bool = True
+
+class JobPostUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    skills_required: Optional[List[str]] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    budget_type: Optional[str] = None
+    duration: Optional[str] = None
+    location: Optional[str] = None
+    remote: Optional[bool] = None
+    status: Optional[str] = None  # open, closed, filled
+
 # ==================== AUTH HELPERS ====================
 
 def hash_password(password: str) -> str:
@@ -1302,6 +1328,371 @@ async def mark_all_notifications_read(request: Request):
     )
     
     return {"message": "All marked as read"}
+
+# ==================== JOB POSTINGS ENDPOINTS ====================
+
+@api_router.post("/jobs")
+async def create_job(data: JobPostCreate, request: Request):
+    """Create a new job posting (clients only)"""
+    user = await require_auth(request)
+    
+    if user["role"] != "client":
+        raise HTTPException(status_code=403, detail="Only clients can post jobs")
+    
+    job = {
+        "id": str(uuid.uuid4()),
+        "client_id": user["id"],
+        "title": data.title,
+        "description": data.description,
+        "category": data.category,
+        "skills_required": data.skills_required,
+        "budget_min": data.budget_min,
+        "budget_max": data.budget_max,
+        "budget_type": data.budget_type,
+        "duration": data.duration,
+        "location": data.location,
+        "remote": data.remote,
+        "status": "open",
+        "applications_count": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.jobs.insert_one(job)
+    
+    # Add client info to response
+    job["client"] = {
+        "id": user["id"],
+        "name": user["name"],
+        "picture": user.get("picture")
+    }
+    
+    return {k: v for k, v in job.items() if k != "_id"}
+
+@api_router.get("/jobs")
+async def list_jobs(
+    request: Request,
+    category: Optional[str] = None,
+    skills: Optional[str] = None,
+    budget_min: Optional[float] = None,
+    budget_max: Optional[float] = None,
+    remote: Optional[bool] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 12
+):
+    """List all open job postings with filters - clients cannot access this"""
+    # Check if user is authenticated and their role
+    user_role = None
+    has_subscription = False
+    
+    try:
+        user = await require_auth(request)
+        user_role = user["role"]
+        
+        # Clients should not see job listings at all
+        if user_role == "client":
+            raise HTTPException(status_code=403, detail="Clients cannot browse jobs. Please visit the talent marketplace instead.")
+        
+        # Check freelancer subscription status
+        if user_role == "freelancer":
+            profile = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+            has_subscription = profile and profile.get("subscription_status") == "active"
+    except HTTPException as e:
+        if e.status_code == 403:
+            raise e
+        # Not authenticated - allow browsing with limited preview
+        pass
+    
+    query = {"status": "open"}
+    
+    if category:
+        query["category"] = category
+    
+    if skills:
+        skill_list = [s.strip() for s in skills.split(",")]
+        query["skills_required"] = {"$in": skill_list}
+    
+    if budget_min is not None:
+        query["budget_max"] = {"$gte": budget_min}
+    
+    if budget_max is not None:
+        query["budget_min"] = {"$lte": budget_max}
+    
+    if remote is not None:
+        query["remote"] = remote
+    
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}},
+            {"skills_required": {"$elemMatch": {"$regex": search, "$options": "i"}}}
+        ]
+    
+    skip = (page - 1) * limit
+    
+    jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.jobs.count_documents(query)
+    
+    # Return limited or full info based on subscription
+    if not has_subscription:
+        # Limited preview for non-subscribed users
+        limited_jobs = []
+        for job in jobs:
+            limited_jobs.append({
+                "id": job["id"],
+                "title": job["title"],
+                "category": job.get("category"),
+                "budget_type": job.get("budget_type"),
+                "created_at": job.get("created_at"),
+                "remote": job.get("remote"),
+                "skills_required": job.get("skills_required", []),
+                "preview_only": True
+            })
+        return {
+            "jobs": limited_jobs,
+            "total": total,
+            "page": page,
+            "pages": (total + limit - 1) // limit,
+            "requires_subscription": True
+        }
+    
+    # Full access for subscribed freelancers
+    for job in jobs:
+        client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
+        if client:
+            job["client"] = client
+    
+    return {
+        "jobs": jobs,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit
+    }
+
+@api_router.get("/jobs/featured")
+async def get_featured_jobs():
+    """Get recent job postings for homepage"""
+    jobs = await db.jobs.find(
+        {"status": "open"},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(6).to_list(6)
+    
+    for job in jobs:
+        client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
+        if client:
+            job["client"] = client
+    
+    return jobs
+
+@api_router.get("/jobs/my-jobs")
+async def get_my_jobs(request: Request):
+    """Get jobs posted by the current client"""
+    user = await require_auth(request)
+    
+    if user["role"] != "client":
+        raise HTTPException(status_code=403, detail="Only clients can view their jobs")
+    
+    jobs = await db.jobs.find({"client_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    
+    return jobs
+
+@api_router.get("/jobs/categories")
+async def get_job_categories():
+    """Get all job categories with counts"""
+    pipeline = [
+        {"$match": {"status": "open"}},
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}}
+    ]
+    results = await db.jobs.aggregate(pipeline).to_list(100)
+    return [{"name": r["_id"], "count": r["count"]} for r in results if r["_id"]]
+
+@api_router.get("/jobs/{job_id}")
+async def get_job(job_id: str, request: Request):
+    """Get a single job posting - freelancers need subscription for full details"""
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if user is authenticated
+    try:
+        user = await require_auth(request)
+        user_role = user["role"]
+        
+        # Clients should not access job details (they post jobs, not view them)
+        if user_role == "client":
+            raise HTTPException(status_code=403, detail="Clients cannot view job details")
+        
+        # Check if freelancer has active subscription
+        if user_role == "freelancer":
+            profile = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+            has_subscription = profile and profile.get("subscription_status") == "active"
+            
+            if not has_subscription:
+                # Return limited job info for non-subscribed freelancers
+                return {
+                    "id": job["id"],
+                    "title": job["title"],
+                    "category": job.get("category"),
+                    "budget_type": job.get("budget_type"),
+                    "created_at": job.get("created_at"),
+                    "remote": job.get("remote"),
+                    "requires_subscription": True,
+                    "preview_only": True
+                }
+    except HTTPException as e:
+        # Not authenticated - return limited preview
+        return {
+            "id": job["id"],
+            "title": job["title"],
+            "category": job.get("category"),
+            "budget_type": job.get("budget_type"),
+            "created_at": job.get("created_at"),
+            "remote": job.get("remote"),
+            "requires_subscription": True,
+            "preview_only": True
+        }
+    
+    # Full access for subscribed freelancers
+    client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
+    if client:
+        job["client"] = client
+    
+    return job
+
+@api_router.put("/jobs/{job_id}")
+async def update_job(job_id: str, data: JobPostUpdate, request: Request):
+    """Update a job posting"""
+    user = await require_auth(request)
+    
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job["client_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.jobs.update_one({"id": job_id}, {"$set": update_data})
+    
+    updated_job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    return updated_job
+
+@api_router.delete("/jobs/{job_id}")
+async def delete_job(job_id: str, request: Request):
+    """Delete a job posting"""
+    user = await require_auth(request)
+    
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job["client_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    await db.jobs.delete_one({"id": job_id})
+    return {"message": "Job deleted"}
+
+@api_router.post("/jobs/{job_id}/apply")
+async def apply_to_job(job_id: str, request: Request):
+    """Apply to a job (freelancers only) - sends a message to the client"""
+    user = await require_auth(request)
+    
+    if user["role"] != "freelancer":
+        raise HTTPException(status_code=403, detail="Only freelancers can apply to jobs")
+    
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job["status"] != "open":
+        raise HTTPException(status_code=400, detail="This job is no longer open")
+    
+    # Check if already applied
+    existing = await db.job_applications.find_one({
+        "job_id": job_id,
+        "freelancer_id": user["id"]
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="You have already applied to this job")
+    
+    # Create application record
+    application = {
+        "id": str(uuid.uuid4()),
+        "job_id": job_id,
+        "freelancer_id": user["id"],
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.job_applications.insert_one(application)
+    
+    # Update application count
+    await db.jobs.update_one({"id": job_id}, {"$inc": {"applications_count": 1}})
+    
+    # Create notification for client
+    notification = {
+        "id": str(uuid.uuid4()),
+        "user_id": job["client_id"],
+        "type": "job_application",
+        "title": "New Job Application",
+        "message": f"{user['name']} applied to your job: {job['title']}",
+        "link": f"/jobs/{job_id}",
+        "is_read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification)
+    
+    return {"message": "Application submitted successfully"}
+
+@api_router.get("/jobs/{job_id}/applications")
+async def get_job_applications(job_id: str, request: Request):
+    """Get applications for a job (client only)"""
+    user = await require_auth(request)
+    
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if job["client_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    applications = await db.job_applications.find({"job_id": job_id}, {"_id": 0}).to_list(100)
+    
+    # Get freelancer info for each application
+    for app in applications:
+        freelancer_user = await db.users.find_one({"id": app["freelancer_id"]}, {"_id": 0, "password_hash": 0})
+        if freelancer_user:
+            app["freelancer"] = freelancer_user
+        
+        freelancer_profile = await db.freelancer_profiles.find_one({"user_id": app["freelancer_id"]}, {"_id": 0})
+        if freelancer_profile:
+            app["freelancer_profile"] = freelancer_profile
+    
+    return applications
+
+@api_router.get("/jobs/applications/my")
+async def get_my_applications(request: Request):
+    """Get current freelancer's job applications"""
+    user = await require_auth(request)
+    
+    if user["role"] != "freelancer":
+        raise HTTPException(status_code=403, detail="Only freelancers can view applications")
+    
+    applications = await db.job_applications.find({"freelancer_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    
+    # Get job info for each application
+    for app in applications:
+        job = await db.jobs.find_one({"id": app["job_id"]}, {"_id": 0})
+        if job:
+            client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
+            if client:
+                job["client"] = client
+            app["job"] = job
+    
+    return applications
 
 # ==================== UTILITY ENDPOINTS ====================
 
