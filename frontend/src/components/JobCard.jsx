@@ -41,21 +41,40 @@ export default function JobCard({ job }) {
 
   return (
     <Link to={`/jobs/${job.id}`} data-testid={`job-card-${job.id}`}>
-      <Card className="freelancer-card h-full hover:border-indigo-200 cursor-pointer">
+      <Card className={`freelancer-card h-full hover:border-indigo-200 cursor-pointer ${isPreviewOnly ? 'relative' : ''}`}>
         <CardContent className="p-6">
+          {/* Preview Only Badge */}
+          {isPreviewOnly && (
+            <div className="absolute top-3 right-3">
+              <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 text-xs flex items-center gap-1">
+                <Lock className="h-3 w-3" />
+                Preview
+              </Badge>
+            </div>
+          )}
+
           {/* Header with client info */}
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={job.client?.picture} />
-                <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-sm">
-                  {getInitials(job.client?.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-sm text-gray-500">{job.client?.name || "Client"}</p>
-                <p className="text-xs text-gray-400">{timeAgo(job.created_at)}</p>
-              </div>
+              {!isPreviewOnly ? (
+                <>
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={job.client?.picture} />
+                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-sm">
+                      {getInitials(job.client?.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm text-gray-500">{job.client?.name || "Client"}</p>
+                    <p className="text-xs text-gray-400">{timeAgo(job.created_at)}</p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-gray-400">
+                  <Lock className="h-4 w-4" />
+                  <p className="text-sm">Subscribe to view client</p>
+                </div>
+              )}
             </div>
             {job.remote && (
               <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
@@ -69,10 +88,18 @@ export default function JobCard({ job }) {
             {job.title}
           </h3>
 
-          {/* Description */}
-          <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-            {job.description}
-          </p>
+          {/* Description - Hidden for preview */}
+          {!isPreviewOnly && job.description && (
+            <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+              {job.description}
+            </p>
+          )}
+          {isPreviewOnly && (
+            <p className="text-gray-400 text-sm mb-4 italic flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              Subscribe to view full job description
+            </p>
+          )}
 
           {/* Skills */}
           <div className="flex flex-wrap gap-2 mb-4">
