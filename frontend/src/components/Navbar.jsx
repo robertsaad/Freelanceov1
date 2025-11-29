@@ -28,7 +28,7 @@ const categories = [
   { name: "Business", icon: Building, href: "/freelancers?category=Business" },
 ];
 
-export default function NavbarEnhanced() {
+export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
