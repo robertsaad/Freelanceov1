@@ -46,3 +46,15 @@ frontend/android/
 .emergent/
 .ruff_cache/
 yarn.lock
+-e 
+# Environment files
+*.env
+*.env.*
+-e 
+# Environment files
+*.env
+*.env.*
+-e 
+# Environment files
+*.env
+*.env.*
