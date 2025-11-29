@@ -243,6 +243,12 @@ export default function Navbar() {
                       Dashboard
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/feed" className="flex items-center gap-2" data-testid="feed-link">
+                      <Users className="h-4 w-4" />
+                      Feed
+                    </Link>
+                  </DropdownMenuItem>
                   {user.role === "freelancer" && (
                     <DropdownMenuItem asChild>
                       <Link to="/dashboard/profile" className="flex items-center gap-2" data-testid="edit-profile-link">
