@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { API } from "@/App";
-import { Search, Filter, Briefcase, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Search, Filter, Briefcase, ChevronLeft, ChevronRight, Plus, Lock, AlertCircle } from "lucide-react";
 import { useAuth } from "@/App";
+import { toast } from "sonner";
 
 const categories = [
   "All Categories",
