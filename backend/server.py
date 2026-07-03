@@ -475,8 +475,11 @@ async def get_featured_freelancers():
     freelancers = await db.freelancer_profiles.find(
         {"subscription_status": "active", "is_suspended": {"$ne": True}},
         {"_id": 0}
-    ).sort([("is_featured", -1), ("average_rating", -1)]).limit(6).to_list(6)
-    
+    ).to_list(200)
+    # Sort in Python (Cosmos RU does not support multi-field sort without a composite index)
+    freelancers.sort(key=lambda f: (0 if f.get("is_featured") else 1, -(f.get("average_rating") or 0)))
+    freelancers = freelancers[:6]
+
     for f in freelancers:
         user = await db.users.find_one({"id": f["user_id"]}, {"_id": 0, "password_hash": 0})
         if user:
@@ -2098,7 +2101,8 @@ async def list_categories():
     """Public list of active categories (used by filters and forms)."""
     cats = await db.categories.find(
         {"is_active": {"$ne": False}}, {"_id": 0}
-    ).sort([("order", 1), ("name", 1)]).to_list(200)
+    ).to_list(200)
+    cats.sort(key=lambda c: (c.get("order") or 0, (c.get("name") or "").lower()))
     return cats
 
 
@@ -2106,7 +2110,8 @@ async def list_categories():
 async def admin_list_categories(request: Request):
     """List all categories including inactive, with usage counts (admin)."""
     await require_admin(request)
-    cats = await db.categories.find({}, {"_id": 0}).sort([("order", 1), ("name", 1)]).to_list(500)
+    cats = await db.categories.find({}, {"_id": 0}).to_list(500)
+    cats.sort(key=lambda c: (c.get("order") or 0, (c.get("name") or "").lower()))
     for c in cats:
         c["freelancer_count"] = await db.freelancer_profiles.count_documents({"category": c["name"]})
         c["job_count"] = await db.jobs.count_documents({"category": c["name"]})
