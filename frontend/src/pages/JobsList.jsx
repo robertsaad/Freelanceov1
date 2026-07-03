@@ -14,22 +14,11 @@ import { API } from "@/App";
 import { Search, Filter, Briefcase, ChevronLeft, ChevronRight, Plus, Lock, AlertCircle } from "lucide-react";
 import { useAuth } from "@/App";
 import { toast } from "sonner";
-
-const categories = [
-  "All Categories",
-  "Web Development",
-  "Design",
-  "Writing",
-  "Video Editing",
-  "Marketing",
-  "Data Science",
-  "Mobile Development",
-  "Music & Audio",
-  "Business"
-];
+import { useCategories } from "@/hooks/useCategories";
 
 export default function JobsList() {
   const { user } = useAuth();
+  const categories = ["All Categories", ...useCategories()];
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [jobs, setJobs] = useState([]);

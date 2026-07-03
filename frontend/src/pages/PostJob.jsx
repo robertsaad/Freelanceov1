@@ -14,18 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Plus, X, Send } from "lucide-react";
-
-const categories = [
-  "Web Development",
-  "Design",
-  "Writing",
-  "Video Editing",
-  "Marketing",
-  "Data Science",
-  "Mobile Development",
-  "Music & Audio",
-  "Business"
-];
+import { useCategories } from "@/hooks/useCategories";
 
 const durations = [
   "Less than 1 week",
@@ -39,6 +28,7 @@ const durations = [
 export default function PostJob() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const categories = useCategories();
   const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({

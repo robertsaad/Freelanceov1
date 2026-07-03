@@ -8,6 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Table,
@@ -39,6 +47,9 @@ import {
   CheckCircle,
   Trash2,
   Search,
+  Plus,
+  Pencil,
+  Tag,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -155,6 +166,7 @@ export default function Admin() {
             <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
             <TabsTrigger value="freelancers" data-testid="tab-freelancers">Freelancers</TabsTrigger>
             <TabsTrigger value="jobs" data-testid="tab-jobs">Jobs</TabsTrigger>
+            <TabsTrigger value="categories" data-testid="tab-categories">Categories</TabsTrigger>
             <TabsTrigger value="payments" data-testid="tab-payments">Payments</TabsTrigger>
           </TabsList>
 
@@ -166,6 +178,9 @@ export default function Admin() {
           </TabsContent>
           <TabsContent value="jobs">
             <JobsTab onChange={loadStats} />
+          </TabsContent>
+          <TabsContent value="categories">
+            <CategoriesTab onChange={loadStats} />
           </TabsContent>
           <TabsContent value="payments">
             <PaymentsTab />
@@ -611,6 +626,229 @@ function PaymentsTab() {
             )}
           </TableBody>
         </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CategoriesTab({ onChange }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [newIcon, setNewIcon] = useState("");
+  const [newOrder, setNewOrder] = useState("");
+  const [edit, setEdit] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get("/admin/categories");
+      setItems(res.data);
+    } catch (e) {
+      toast.error("Failed to load categories");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const add = async () => {
+    if (!newName.trim()) {
+      toast.error("Enter a category name");
+      return;
+    }
+    try {
+      await api.post("/admin/categories", {
+        name: newName.trim(),
+        icon: newIcon.trim() || null,
+        order: newOrder === "" ? 0 : Number(newOrder),
+      });
+      toast.success("Category added");
+      setNewName("");
+      setNewIcon("");
+      setNewOrder("");
+      load();
+      onChange && onChange();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Failed to add category");
+    }
+  };
+
+  const seed = async () => {
+    try {
+      const res = await api.post("/admin/categories/seed");
+      toast.success(res.data?.message || "Seeded defaults");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Seed failed");
+    }
+  };
+
+  const toggleActive = async (c, value) => {
+    try {
+      await api.patch(`/admin/categories/${c.id}`, { is_active: value });
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Action failed");
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!edit.name.trim()) {
+      toast.error("Name cannot be empty");
+      return;
+    }
+    try {
+      await api.patch(`/admin/categories/${edit.id}`, {
+        name: edit.name.trim(),
+        icon: edit.icon.trim() || null,
+        order: edit.order === "" ? 0 : Number(edit.order),
+      });
+      toast.success("Category updated");
+      setEdit(null);
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Update failed");
+    }
+  };
+
+  const remove = async (id) => {
+    try {
+      await api.delete(`/admin/categories/${id}`);
+      toast.success("Category deleted");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Delete failed");
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Tag className="h-5 w-5 text-cyan-600" /> Categories
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap items-end gap-2 mb-4">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Name</label>
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. AI & Machine Learning"
+              className="w-56"
+              data-testid="category-name-input"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Icon (optional)</label>
+            <Input
+              value={newIcon}
+              onChange={(e) => setNewIcon(e.target.value)}
+              placeholder="lucide name"
+              className="w-40"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Order</label>
+            <Input
+              type="number"
+              value={newOrder}
+              onChange={(e) => setNewOrder(e.target.value)}
+              placeholder="0"
+              className="w-20"
+            />
+          </div>
+          <Button className="bg-cyan-600 hover:bg-cyan-700" onClick={add} data-testid="category-add-btn">
+            <Plus className="h-4 w-4 mr-1" /> Add
+          </Button>
+          <Button variant="outline" onClick={seed} data-testid="category-seed-btn">
+            Seed defaults
+          </Button>
+        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">Order</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Icon</TableHead>
+              <TableHead>Usage</TableHead>
+              <TableHead>Active</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={6} className="text-center text-gray-400">Loading…</TableCell></TableRow>
+            ) : items.length === 0 ? (
+              <TableRow><TableCell colSpan={6} className="text-center text-gray-400">No categories yet — click “Seed defaults” to start.</TableCell></TableRow>
+            ) : (
+              items.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell>{c.order}</TableCell>
+                  <TableCell className="font-medium">{c.name}</TableCell>
+                  <TableCell className="text-gray-500">{c.icon || "—"}</TableCell>
+                  <TableCell className="text-gray-500">
+                    {c.freelancer_count || 0} freelancers · {c.job_count || 0} jobs
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={c.is_active !== false}
+                      onCheckedChange={(v) => toggleActive(c, v)}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setEdit({ id: c.id, name: c.name, icon: c.icon || "", order: String(c.order ?? 0) })
+                        }
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <ConfirmDelete onConfirm={() => remove(c.id)} label="Delete category" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+
+        <Dialog open={!!edit} onOpenChange={(o) => { if (!o) setEdit(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit category</DialogTitle>
+            </DialogHeader>
+            {edit && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Name</label>
+                  <Input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Icon (lucide name, optional)</label>
+                  <Input value={edit.icon} onChange={(e) => setEdit({ ...edit, icon: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Order</label>
+                  <Input type="number" value={edit.order} onChange={(e) => setEdit({ ...edit, order: e.target.value })} />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEdit(null)}>Cancel</Button>
+              <Button className="bg-cyan-600 hover:bg-cyan-700" onClick={saveEdit}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

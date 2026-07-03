@@ -14,22 +14,12 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Plus, X, Save, Trash2, ExternalLink } from "lucide-react";
-
-const categories = [
-  "Web Development",
-  "Design",
-  "Writing",
-  "Video Editing",
-  "Marketing",
-  "Data Science",
-  "Mobile Development",
-  "Music & Audio",
-  "Business"
-];
+import { useCategories } from "@/hooks/useCategories";
 
 export default function EditProfile() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const categories = useCategories();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);

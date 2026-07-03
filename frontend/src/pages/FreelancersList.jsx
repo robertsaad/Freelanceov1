@@ -10,22 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API } from "@/App";
 import { Search, Filter, Users, ChevronLeft, ChevronRight } from "lucide-react";
-
-const categories = [
-  "All Categories",
-  "Web Development",
-  "Design",
-  "Writing",
-  "Video Editing",
-  "Marketing",
-  "Data Science",
-  "Mobile Development",
-  "Music & Audio",
-  "Business"
-];
+import { useCategories } from "@/hooks/useCategories";
 
 export default function FreelancersList() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const categories = ["All Categories", ...useCategories()];
   const [freelancers, setFreelancers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);

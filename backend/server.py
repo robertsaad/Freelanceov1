@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any
 import uuid
+import re
 from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
@@ -2062,6 +2063,179 @@ async def admin_list_payments(
         "page": page,
         "pages": (total + limit - 1) // limit,
     }
+
+# ==================== CATEGORY MODELS ====================
+
+class CategoryCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    order: Optional[int] = 0
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+DEFAULT_CATEGORIES = [
+    {"name": "Web Development", "icon": "Code"},
+    {"name": "Design", "icon": "Palette"},
+    {"name": "Writing", "icon": "PenTool"},
+    {"name": "Video Editing", "icon": "Video"},
+    {"name": "Marketing", "icon": "TrendingUp"},
+    {"name": "Data Science", "icon": "Database"},
+    {"name": "Mobile Development", "icon": "Smartphone"},
+    {"name": "Music & Audio", "icon": "Music"},
+    {"name": "Business", "icon": "Building"},
+]
+
+# ==================== CATEGORY ENDPOINTS ====================
+
+@api_router.get("/categories")
+async def list_categories():
+    """Public list of active categories (used by filters and forms)."""
+    cats = await db.categories.find(
+        {"is_active": {"$ne": False}}, {"_id": 0}
+    ).sort([("order", 1), ("name", 1)]).to_list(200)
+    return cats
+
+
+@api_router.get("/admin/categories")
+async def admin_list_categories(request: Request):
+    """List all categories including inactive, with usage counts (admin)."""
+    await require_admin(request)
+    cats = await db.categories.find({}, {"_id": 0}).sort([("order", 1), ("name", 1)]).to_list(500)
+    for c in cats:
+        c["freelancer_count"] = await db.freelancer_profiles.count_documents({"category": c["name"]})
+        c["job_count"] = await db.jobs.count_documents({"category": c["name"]})
+    return cats
+
+
+@api_router.post("/admin/categories")
+async def admin_create_category(data: CategoryCreate, request: Request):
+    await require_admin(request)
+    name = (data.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required")
+    existing = await db.categories.find_one(
+        {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Category already exists")
+    now = datetime.now(timezone.utc).isoformat()
+    cat = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "description": data.description,
+        "icon": data.icon,
+        "order": data.order or 0,
+        "is_active": True,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.categories.insert_one(cat)
+    return {k: v for k, v in cat.items() if k != "_id"}
+
+
+@api_router.patch("/admin/categories/{category_id}")
+async def admin_update_category(category_id: str, data: CategoryUpdate, request: Request):
+    await require_admin(request)
+    cat = await db.categories.find_one({"id": category_id})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    updates: Dict[str, Any] = {}
+    if data.name is not None:
+        new_name = data.name.strip()
+        if not new_name:
+            raise HTTPException(status_code=400, detail="Name cannot be empty")
+        conflict = await db.categories.find_one({
+            "name": {"$regex": f"^{re.escape(new_name)}$", "$options": "i"},
+            "id": {"$ne": category_id},
+        })
+        if conflict:
+            raise HTTPException(status_code=400, detail="Another category with this name exists")
+        updates["name"] = new_name
+    if data.description is not None:
+        updates["description"] = data.description
+    if data.icon is not None:
+        updates["icon"] = data.icon
+    if data.order is not None:
+        updates["order"] = data.order
+    if data.is_active is not None:
+        updates["is_active"] = data.is_active
+
+    if updates:
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+        # Keep existing profiles/jobs in sync when a category is renamed
+        if "name" in updates and updates["name"] != cat["name"]:
+            await db.freelancer_profiles.update_many(
+                {"category": cat["name"]}, {"$set": {"category": updates["name"]}}
+            )
+            await db.jobs.update_many(
+                {"category": cat["name"]}, {"$set": {"category": updates["name"]}}
+            )
+        await db.categories.update_one({"id": category_id}, {"$set": updates})
+
+    updated = await db.categories.find_one({"id": category_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/admin/categories/{category_id}")
+async def admin_delete_category(category_id: str, request: Request):
+    await require_admin(request)
+    cat = await db.categories.find_one({"id": category_id})
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    await db.categories.delete_one({"id": category_id})
+    return {"message": "Category deleted"}
+
+
+@api_router.post("/admin/categories/seed")
+async def admin_seed_categories(request: Request):
+    """Seed default categories plus any already used by profiles/jobs (admin)."""
+    await require_admin(request)
+    now = datetime.now(timezone.utc).isoformat()
+    existing_docs = await db.categories.find({}, {"_id": 0, "name": 1}).to_list(1000)
+    existing_names = {d["name"].strip().lower() for d in existing_docs if d.get("name")}
+    order = len(existing_names)
+    to_insert = []
+
+    def build(name, icon=None):
+        nonlocal order
+        key = (name or "").strip().lower()
+        if not key or key in existing_names:
+            return None
+        existing_names.add(key)
+        order += 1
+        return {
+            "id": str(uuid.uuid4()),
+            "name": name.strip(),
+            "description": None,
+            "icon": icon,
+            "order": order,
+            "is_active": True,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+    for d in DEFAULT_CATEGORIES:
+        doc = build(d["name"], d.get("icon"))
+        if doc:
+            to_insert.append(doc)
+
+    prof_cats = await db.freelancer_profiles.distinct("category")
+    job_cats = await db.jobs.distinct("category")
+    for name in list(prof_cats) + list(job_cats):
+        doc = build(name)
+        if doc:
+            to_insert.append(doc)
+
+    if to_insert:
+        await db.categories.insert_many(to_insert)
+    return {"message": f"Seeded {len(to_insert)} categories", "created": len(to_insert)}
 
 # ==================== UTILITY ENDPOINTS ====================
 
