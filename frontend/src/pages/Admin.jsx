@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { useAuth, API } from "@/App";
+import { useAuth } from "@/App";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MobileNav from "@/components/MobileNav";
@@ -41,6 +41,7 @@ import {
   Search,
 } from "lucide-react";
 
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const api = axios.create({ baseURL: API, withCredentials: true });
 
 function StatCard({ icon: Icon, label, value, sub }) {
