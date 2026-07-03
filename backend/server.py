@@ -202,6 +202,8 @@ async def get_current_user(request: Request) -> Optional[dict]:
         })
         if session:
             user = await db.users.find_one({"id": session["user_id"]}, {"_id": 0})
+            if user and user.get("is_active", True) is False:
+                return None
             return user
     
     # Check Authorization header
@@ -211,6 +213,8 @@ async def get_current_user(request: Request) -> Optional[dict]:
         payload = decode_jwt_token(token)
         if payload:
             user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0})
+            if user and user.get("is_active", True) is False:
+                return None
             return user
     
     return None
@@ -219,6 +223,12 @@ async def require_auth(request: Request) -> dict:
     user = await get_current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+async def require_admin(request: Request) -> dict:
+    user = await require_auth(request)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
 # ==================== AUTH ENDPOINTS ====================
@@ -421,7 +431,7 @@ async def list_freelancers(
     limit: int = 12
 ):
     """List freelancers with filters - only show those with active subscriptions"""
-    query = {"subscription_status": "active"}
+    query = {"subscription_status": "active", "is_suspended": {"$ne": True}}
     
     if category:
         query["category"] = category
@@ -462,9 +472,9 @@ async def list_freelancers(
 async def get_featured_freelancers():
     """Get top rated freelancers for homepage"""
     freelancers = await db.freelancer_profiles.find(
-        {"subscription_status": "active"},
+        {"subscription_status": "active", "is_suspended": {"$ne": True}},
         {"_id": 0}
-    ).sort("average_rating", -1).limit(6).to_list(6)
+    ).sort([("is_featured", -1), ("average_rating", -1)]).limit(6).to_list(6)
     
     for f in freelancers:
         user = await db.users.find_one({"id": f["user_id"]}, {"_id": 0, "password_hash": 0})
@@ -1699,6 +1709,359 @@ async def get_my_applications(request: Request):
             app["job"] = job
     
     return applications
+
+# ==================== ADMIN MODELS ====================
+
+class AdminRoleUpdate(BaseModel):
+    role: str  # freelancer, client, admin
+
+class AdminActiveUpdate(BaseModel):
+    is_active: bool
+
+class AdminSuspendUpdate(BaseModel):
+    is_suspended: bool
+
+class AdminFeatureUpdate(BaseModel):
+    is_featured: bool
+
+class AdminJobStatusUpdate(BaseModel):
+    status: str  # open, closed, filled
+
+class AdminBootstrapRequest(BaseModel):
+    email: EmailStr
+    secret: str
+
+# ==================== ADMIN ENDPOINTS ====================
+
+@api_router.post("/admin/bootstrap")
+async def admin_bootstrap(data: AdminBootstrapRequest):
+    """Promote an existing user to admin using a server-side secret.
+    Disabled (404) unless the ADMIN_BOOTSTRAP_SECRET env var is configured."""
+    configured_secret = os.environ.get("ADMIN_BOOTSTRAP_SECRET", "")
+    if not configured_secret:
+        raise HTTPException(status_code=404, detail="Not found")
+    if data.secret != configured_secret:
+        raise HTTPException(status_code=403, detail="Invalid secret")
+    user = await db.users.find_one({"email": data.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"role": "admin", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": f"{data.email} is now an admin"}
+
+
+@api_router.get("/admin/stats")
+async def admin_stats(request: Request):
+    """Overview counts for the admin dashboard."""
+    await require_admin(request)
+
+    total_users = await db.users.count_documents({})
+    total_freelancers = await db.users.count_documents({"role": "freelancer"})
+    total_clients = await db.users.count_documents({"role": "client"})
+    total_admins = await db.users.count_documents({"role": "admin"})
+    banned_users = await db.users.count_documents({"is_active": False})
+
+    total_profiles = await db.freelancer_profiles.count_documents({})
+    active_subscriptions = await db.freelancer_profiles.count_documents({"subscription_status": "active"})
+    suspended_profiles = await db.freelancer_profiles.count_documents({"is_suspended": True})
+
+    total_jobs = await db.jobs.count_documents({})
+    open_jobs = await db.jobs.count_documents({"status": "open"})
+    total_applications = await db.job_applications.count_documents({})
+
+    paid_transactions = await db.payment_transactions.find(
+        {"payment_status": "paid"}, {"_id": 0}
+    ).to_list(10000)
+    total_revenue = round(sum(t.get("amount", 0) for t in paid_transactions), 2)
+
+    return {
+        "users": {
+            "total": total_users,
+            "freelancers": total_freelancers,
+            "clients": total_clients,
+            "admins": total_admins,
+            "banned": banned_users,
+        },
+        "freelancer_profiles": {
+            "total": total_profiles,
+            "active_subscriptions": active_subscriptions,
+            "suspended": suspended_profiles,
+        },
+        "jobs": {
+            "total": total_jobs,
+            "open": open_jobs,
+            "applications": total_applications,
+        },
+        "revenue": {
+            "total": total_revenue,
+            "paid_transactions": len(paid_transactions),
+            "currency": "usd",
+        },
+    }
+
+
+@api_router.get("/admin/users")
+async def admin_list_users(
+    request: Request,
+    search: Optional[str] = None,
+    role: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
+):
+    """List/search all users (admin)."""
+    await require_admin(request)
+
+    query: Dict[str, Any] = {}
+    if role:
+        query["role"] = role
+    if search:
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"email": {"$regex": search, "$options": "i"}},
+        ]
+
+    skip = (page - 1) * limit
+    users = await db.users.find(
+        query, {"_id": 0, "password_hash": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.users.count_documents(query)
+
+    return {
+        "users": users,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit,
+    }
+
+
+@api_router.patch("/admin/users/{user_id}/status")
+async def admin_set_user_status(user_id: str, data: AdminActiveUpdate, request: Request):
+    """Ban (is_active=false) or reactivate (is_active=true) a user."""
+    admin = await require_admin(request)
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="You cannot change your own status")
+
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"is_active": data.is_active, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if not data.is_active:
+        await db.sessions.delete_many({"user_id": user_id})
+
+    return {"message": "User status updated", "is_active": data.is_active}
+
+
+@api_router.patch("/admin/users/{user_id}/role")
+async def admin_set_user_role(user_id: str, data: AdminRoleUpdate, request: Request):
+    """Change a user's role."""
+    admin = await require_admin(request)
+    if data.role not in ("freelancer", "client", "admin"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="You cannot change your own role")
+
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"role": data.role, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "User role updated", "role": data.role}
+
+
+@api_router.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, request: Request):
+    """Delete a user and their associated profile and sessions."""
+    admin = await require_admin(request)
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await db.users.delete_one({"id": user_id})
+    await db.sessions.delete_many({"user_id": user_id})
+    await db.freelancer_profiles.delete_many({"user_id": user_id})
+    return {"message": "User deleted"}
+
+
+@api_router.get("/admin/freelancers")
+async def admin_list_freelancers(
+    request: Request,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
+):
+    """List all freelancer profiles regardless of subscription/suspension (admin)."""
+    await require_admin(request)
+
+    query: Dict[str, Any] = {}
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"category": {"$regex": search, "$options": "i"}},
+        ]
+
+    skip = (page - 1) * limit
+    profiles = await db.freelancer_profiles.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.freelancer_profiles.count_documents(query)
+
+    for p in profiles:
+        u = await db.users.find_one({"id": p["user_id"]}, {"_id": 0, "password_hash": 0})
+        if u:
+            p["user"] = u
+
+    return {
+        "freelancers": profiles,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit,
+    }
+
+
+@api_router.patch("/admin/freelancers/{profile_id}/suspend")
+async def admin_suspend_freelancer(profile_id: str, data: AdminSuspendUpdate, request: Request):
+    """Suspend (hide) or unsuspend a freelancer profile."""
+    await require_admin(request)
+    profile = await db.freelancer_profiles.find_one({"id": profile_id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    await db.freelancer_profiles.update_one(
+        {"id": profile_id},
+        {"$set": {"is_suspended": data.is_suspended, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Profile suspension updated", "is_suspended": data.is_suspended}
+
+
+@api_router.patch("/admin/freelancers/{profile_id}/feature")
+async def admin_feature_freelancer(profile_id: str, data: AdminFeatureUpdate, request: Request):
+    """Feature or unfeature a freelancer profile on the homepage."""
+    await require_admin(request)
+    profile = await db.freelancer_profiles.find_one({"id": profile_id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    await db.freelancer_profiles.update_one(
+        {"id": profile_id},
+        {"$set": {"is_featured": data.is_featured, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Profile feature updated", "is_featured": data.is_featured}
+
+
+@api_router.delete("/admin/freelancers/{profile_id}")
+async def admin_delete_freelancer(profile_id: str, request: Request):
+    """Delete a freelancer profile."""
+    await require_admin(request)
+    profile = await db.freelancer_profiles.find_one({"id": profile_id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    await db.freelancer_profiles.delete_one({"id": profile_id})
+    return {"message": "Profile deleted"}
+
+
+@api_router.get("/admin/jobs")
+async def admin_list_jobs(
+    request: Request,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
+):
+    """List all job postings (admin)."""
+    await require_admin(request)
+
+    query: Dict[str, Any] = {}
+    if status:
+        query["status"] = status
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"category": {"$regex": search, "$options": "i"}},
+        ]
+
+    skip = (page - 1) * limit
+    jobs = await db.jobs.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.jobs.count_documents(query)
+
+    for j in jobs:
+        c = await db.users.find_one({"id": j["client_id"]}, {"_id": 0, "password_hash": 0})
+        if c:
+            j["client"] = c
+
+    return {
+        "jobs": jobs,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit,
+    }
+
+
+@api_router.patch("/admin/jobs/{job_id}/status")
+async def admin_set_job_status(job_id: str, data: AdminJobStatusUpdate, request: Request):
+    """Change a job's status (open/closed/filled)."""
+    await require_admin(request)
+    if data.status not in ("open", "closed", "filled"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {"status": data.status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Job status updated", "status": data.status}
+
+
+@api_router.delete("/admin/jobs/{job_id}")
+async def admin_delete_job(job_id: str, request: Request):
+    """Delete a job posting and its applications."""
+    await require_admin(request)
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    await db.jobs.delete_one({"id": job_id})
+    await db.job_applications.delete_many({"job_id": job_id})
+    return {"message": "Job deleted"}
+
+
+@api_router.get("/admin/payments")
+async def admin_list_payments(
+    request: Request,
+    page: int = 1,
+    limit: int = 20,
+):
+    """List payment transactions (admin)."""
+    await require_admin(request)
+
+    skip = (page - 1) * limit
+    transactions = await db.payment_transactions.find(
+        {}, {"_id": 0, "metadata": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    total = await db.payment_transactions.count_documents({})
+
+    for t in transactions:
+        u = await db.users.find_one({"id": t.get("user_id")}, {"_id": 0, "password_hash": 0})
+        if u:
+            t["user"] = {"id": u.get("id"), "name": u.get("name"), "email": u.get("email")}
+
+    return {
+        "transactions": transactions,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit,
+    }
 
 # ==================== UTILITY ENDPOINTS ====================
 

@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Menu, X, User, LayoutDashboard, MessageSquare, FileText, LogOut, 
   ChevronDown, Briefcase, Search, Users, Code, Palette, PenTool, 
-  Video, TrendingUp, Database, Smartphone, Music, Building, ArrowRight 
+  Video, TrendingUp, Database, Smartphone, Music, Building, ArrowRight, Shield 
 } from "lucide-react";
 
 const categories = [
@@ -269,6 +269,14 @@ export default function Navbar() {
                       Hiring Requests
                     </Link>
                   </DropdownMenuItem>
+                  {user.role === "admin" && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin" className="flex items-center gap-2" data-testid="admin-link">
+                        <Shield className="h-4 w-4" />
+                        Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600" data-testid="logout-btn">
                     <LogOut className="h-4 w-4 mr-2" />

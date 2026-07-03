@@ -22,6 +22,7 @@ import Notifications from "@/pages/Notifications";
 import JobsList from "@/pages/JobsList";
 import JobDetail from "@/pages/JobDetail";
 import PostJob from "@/pages/PostJob";
+import Admin from "@/pages/Admin";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -229,6 +230,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute roles={["client"]}>
             <PostJob />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <Admin />
           </ProtectedRoute>
         }
       />
