@@ -16,6 +16,20 @@
         "description": "Location for all resources"
       }
     },
+    "staticWebAppLocation": {
+      "type": "string",
+      "defaultValue": "westeurope",
+      "allowedValues": [
+        "westus2",
+        "centralus",
+        "eastus2",
+        "westeurope",
+        "eastasia"
+      ],
+      "metadata": {
+        "description": "Location for the Static Web App (limited to SWA-supported regions)."
+      }
+    },
     "environment": {
       "type": "string",
       "defaultValue": "test",
@@ -30,8 +44,9 @@
     },
     "githubRepoUrl": {
       "type": "string",
+      "defaultValue": "",
       "metadata": {
-        "description": "GitHub repository URL (e.g., https://github.com/username/repo)"
+        "description": "(Optional) GitHub repository URL. Not required when deploying via workflow tokens."
       }
     },
     "githubBranch": {
@@ -43,8 +58,9 @@
     },
     "githubToken": {
       "type": "securestring",
+      "defaultValue": "",
       "metadata": {
-        "description": "GitHub Personal Access Token for deployment"
+        "description": "(Optional) GitHub PAT. Not required when deploying via workflow tokens."
       }
     },
     "jwtSecret": {
@@ -56,8 +72,9 @@
     },
     "stripeApiKey": {
       "type": "securestring",
+      "defaultValue": "sk_test_placeholder",
       "metadata": {
-        "description": "Stripe API Secret Key"
+        "description": "Stripe API Secret Key (use a test key or placeholder for non-payment testing)"
       }
     },
     "cosmosDbThroughput": {
@@ -148,6 +165,9 @@
           },
           {
             "name": "DisableRateLimitingResponses"
+          },
+          {
+            "name": "EnableServerless"
           }
         ],
         "backupPolicy": {
@@ -171,9 +191,6 @@
       "properties": {
         "resource": {
           "id": "[variables('cosmosDbDatabaseName')]"
-        },
-        "options": {
-          "throughput": "[parameters('cosmosDbThroughput')]"
         }
       }
     },
@@ -447,39 +464,15 @@
               "value": "[reference(resourceId('Microsoft.Insights/components', variables('appInsightsName')), '2020-02-02').ConnectionString]"
             }
           ],
-          "appCommandLine": "gunicorn -w 4 -k uvicorn.workers.UvicornWorker server:app --bind 0.0.0.0:8000"
+          "appCommandLine": "gunicorn -w 2 -k uvicorn.workers.UvicornWorker server:app --bind 0.0.0.0:8000"
         }
-      },
-      "resources": [
-        {
-          "type": "sourcecontrols",
-          "apiVersion": "2022-03-01",
-          "name": "web",
-          "dependsOn": [
-            "[resourceId('Microsoft.Web/sites', variables('backendAppName'))]"
-          ],
-          "properties": {
-            "repoUrl": "[parameters('githubRepoUrl')]",
-            "branch": "[parameters('githubBranch')]",
-            "isManualIntegration": false,
-            "deploymentRollbackEnabled": true,
-            "isMercurial": false,
-            "gitHubActionConfiguration": {
-              "codeConfiguration": {
-                "runtimeStack": "python",
-                "runtimeVersion": "3.11"
-              },
-              "generateWorkflowFile": true
-            }
-          }
-        }
-      ]
+      }
     },
     {
       "type": "Microsoft.Web/staticSites",
       "apiVersion": "2022-03-01",
       "name": "[variables('staticWebAppName')]",
-      "location": "[parameters('location')]",
+      "location": "[parameters('staticWebAppLocation')]",
       "dependsOn": [
         "[resourceId('Microsoft.Web/sites', variables('backendAppName'))]"
       ],
@@ -487,17 +480,7 @@
         "name": "Free",
         "tier": "Free"
       },
-      "properties": {
-        "repositoryUrl": "[parameters('githubRepoUrl')]",
-        "branch": "[parameters('githubBranch')]",
-        "repositoryToken": "[parameters('githubToken')]",
-        "buildProperties": {
-          "appLocation": "/frontend",
-          "outputLocation": "build",
-          "appBuildCommand": "yarn build",
-          "skipGithubActionWorkflowGeneration": false
-        }
-      }
+      "properties": {}
     },
     {
       "type": "Microsoft.Web/staticSites/config",

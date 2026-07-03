@@ -20,7 +20,13 @@ load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+_use_mock_db = os.environ.get('USE_MOCK_DB', '').lower() in ('1', 'true', 'yes') or mongo_url.startswith('mock')
+if _use_mock_db:
+    # In-memory MongoDB replacement for local testing (no server required)
+    from mongomock_motor import AsyncMongoMockClient
+    client = AsyncMongoMockClient()
+else:
+    client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'freelancer_platform')]
 
 # JWT Config
