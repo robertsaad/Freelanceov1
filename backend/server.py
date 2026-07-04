@@ -90,6 +90,25 @@ class PortfolioItem(BaseModel):
     image_url: Optional[str] = None
     link: Optional[str] = None
 
+class EmploymentHistoryItem(BaseModel):
+    company: str
+    title: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    currently_working: Optional[bool] = False
+    description: Optional[str] = None
+
+class EducationItem(BaseModel):
+    school: str
+    degree: Optional[str] = None
+    field_of_study: Optional[str] = None
+    start_year: Optional[str] = None
+    end_year: Optional[str] = None
+
+class LanguageItem(BaseModel):
+    language: str
+    proficiency: str  # basic, conversational, fluent, native
+
 class FreelancerProfileCreate(BaseModel):
     title: str
     bio: str
@@ -98,6 +117,23 @@ class FreelancerProfileCreate(BaseModel):
     hourly_rate: float
     experience_years: int
     location: Optional[str] = None
+    # Onboarding fields
+    experience_level: Optional[str] = None  # brand_new, some_experience, expert
+    goal: Optional[str] = None  # main_income, side_money, experience, undecided
+    work_preference: Optional[str] = None  # find_work, sell_packages
+    open_to_contract: Optional[bool] = None
+    specialties: Optional[List[str]] = None
+    employment_history: Optional[List[EmploymentHistoryItem]] = None
+    education: Optional[List[EducationItem]] = None
+    languages: Optional[List[LanguageItem]] = None
+    phone: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    country: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
+    profile_photo: Optional[str] = None
 
 class FreelancerProfileUpdate(BaseModel):
     title: Optional[str] = None
@@ -108,6 +144,23 @@ class FreelancerProfileUpdate(BaseModel):
     experience_years: Optional[int] = None
     location: Optional[str] = None
     is_available: Optional[bool] = None
+    # Onboarding fields
+    experience_level: Optional[str] = None
+    goal: Optional[str] = None
+    work_preference: Optional[str] = None
+    open_to_contract: Optional[bool] = None
+    specialties: Optional[List[str]] = None
+    employment_history: Optional[List[EmploymentHistoryItem]] = None
+    education: Optional[List[EducationItem]] = None
+    languages: Optional[List[LanguageItem]] = None
+    phone: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    country: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
+    profile_photo: Optional[str] = None
 
 class AddPortfolioItem(BaseModel):
     title: str
@@ -542,6 +595,22 @@ async def create_freelancer_profile(data: FreelancerProfileCreate, request: Requ
         "hourly_rate": data.hourly_rate,
         "experience_years": data.experience_years,
         "location": data.location,
+        "experience_level": data.experience_level,
+        "goal": data.goal,
+        "work_preference": data.work_preference,
+        "open_to_contract": data.open_to_contract,
+        "specialties": data.specialties or [],
+        "employment_history": [e.model_dump() for e in data.employment_history] if data.employment_history else [],
+        "education": [e.model_dump() for e in data.education] if data.education else [],
+        "languages": [l.model_dump() for l in data.languages] if data.languages else [],
+        "phone": data.phone,
+        "date_of_birth": data.date_of_birth,
+        "country": data.country,
+        "address": data.address,
+        "city": data.city,
+        "state": data.state,
+        "zip_code": data.zip_code,
+        "profile_photo": data.profile_photo,
         "portfolio_items": [],
         "is_available": True,
         "subscription_status": "inactive",
@@ -553,6 +622,7 @@ async def create_freelancer_profile(data: FreelancerProfileCreate, request: Requ
     }
     
     await db.freelancer_profiles.insert_one(profile)
+    profile.pop("_id", None)
     return profile
 
 @api_router.put("/freelancers/profile")

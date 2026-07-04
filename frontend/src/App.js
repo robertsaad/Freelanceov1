@@ -13,6 +13,7 @@ import FreelancersList from "@/pages/FreelancersList";
 import FreelancerProfile from "@/pages/FreelancerProfile";
 import Dashboard from "@/pages/Dashboard";
 import EditProfile from "@/pages/EditProfile";
+import FreelancerOnboarding from "@/pages/FreelancerOnboarding";
 import Messages from "@/pages/Messages";
 import HiringRequests from "@/pages/HiringRequests";
 import Pricing from "@/pages/Pricing";
@@ -188,6 +189,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Notifications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute roles={["freelancer"]}>
+            <FreelancerOnboarding />
           </ProtectedRoute>
         }
       />

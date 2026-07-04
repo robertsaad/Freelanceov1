@@ -43,7 +43,7 @@ export default function Register() {
     try {
       await register(formData.email, formData.password, formData.name, formData.role);
       toast.success("Account created successfully!");
-      navigate("/dashboard");
+      navigate(formData.role === "freelancer" ? "/onboarding" : "/dashboard");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Registration failed");
     } finally {
