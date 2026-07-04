@@ -215,9 +215,35 @@ export default function FreelancerOnboarding() {
     }
   };
 
+  // Returns a specific message explaining what's missing on the current step, or null.
+  const validationMessage = () => {
+    switch (steps[step]) {
+      case "experience":
+        return "Please select your experience level to continue.";
+      case "goal":
+        return "Please pick a goal to continue.";
+      case "work_preference":
+        return "Please choose how you'd like to work.";
+      case "category":
+        return "Please select a category.";
+      case "skills":
+        return "Please add at least one skill.";
+      case "title":
+        return "Please enter a professional title.";
+      case "bio":
+        return `Please write at least 50 characters (you have ${data.bio.trim().length}).`;
+      case "rate":
+        if (!(Number(data.hourly_rate) > 0)) return "Please enter your hourly rate.";
+        if (data.experience_years === "") return "Please enter your years of experience.";
+        return "Please complete this step to continue.";
+      default:
+        return "Please complete this step to continue.";
+    }
+  };
+
   const next = () => {
     if (!canProceed()) {
-      toast.error("Please complete this step to continue.");
+      toast.error(validationMessage());
       return;
     }
     setStep((s) => Math.min(s + 1, steps.length - 1));
@@ -655,7 +681,11 @@ export default function FreelancerOnboarding() {
               placeholder="I'm a full-stack developer with 5 years of experience building..."
               data-testid="onboarding-bio-input"
             />
-            <p className="text-xs text-gray-400">{data.bio.trim().length} characters</p>
+            <p className={`text-xs ${data.bio.trim().length >= 50 ? "text-emerald-600" : "text-gray-400"}`}>
+              {data.bio.trim().length >= 50
+                ? `${data.bio.trim().length} characters — looks good!`
+                : `${data.bio.trim().length}/50 characters minimum`}
+            </p>
           </StepShell>
         )}
 
