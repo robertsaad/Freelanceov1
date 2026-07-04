@@ -6,6 +6,30 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-04 — Remove Emergent auth dependency (email/password only)
+
+**Summary:** Removed all dependency on Emergent Auth / Google OAuth from sign-up and
+sign-in. Both freelancer and client accounts now register and log in with
+email + password only, stored in Cosmos DB (bcrypt-hashed). This enables creating
+test users directly for internal testing without any external auth provider.
+
+**Changed**
+- `frontend/src/pages/Login.jsx` — removed "Continue with Google" buttons and the
+  `auth.emergentagent.com` redirect; email/password form only.
+- `frontend/src/pages/Register.jsx` — removed Google sign-up buttons and Emergent
+  redirect; email/password form only (role selector: freelancer/client retained).
+- `frontend/src/App.js` — removed `loginWithGoogle`, the `OAuthCallback` handler and
+  its routes, and the OAuth callback effect; cleaned up now-unused imports.
+- `backend/server.py` — removed the `/api/auth/google-session` endpoint and the
+  `GoogleSessionRequest` model (both called `demobackend.emergentagent.com`).
+
+**Notes**
+- `POST /api/auth/register` and `POST /api/auth/login` (email/password, JWT + session
+  cookie) are the sole auth paths; users persist in the `users` collection in Cosmos.
+- Stripe still uses `emergentintegrations` for payments — out of scope for this change.
+
+---
+
 ## 2026-07-04 — Documentation refresh (v1.1)
 
 **Summary:** Updated all project documents to match the current application and the

@@ -96,10 +96,6 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-class GoogleSessionRequest(BaseModel):
-    session_id: str
-    role: str = "freelancer"
-
 class UserResponse(BaseModel):
     id: str
     email: str
@@ -413,79 +409,6 @@ async def login(data: UserLogin, response: Response):
         picture=user.get("picture"),
         role=user["role"],
         auth_provider=user["auth_provider"]
-    )
-
-@api_router.post("/auth/google-session", response_model=UserResponse)
-async def google_session(data: GoogleSessionRequest, response: Response):
-    """Process Google OAuth session from Emergent Auth"""
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": data.session_id}
-            )
-            
-            if resp.status_code != 200:
-                raise HTTPException(status_code=401, detail="Invalid session")
-            
-            google_data = resp.json()
-    except Exception as e:
-        logger.error(f"Google auth error: {e}")
-        raise HTTPException(status_code=401, detail="Failed to verify Google session")
-    
-    # Check if user exists
-    existing_user = await db.users.find_one({"email": google_data["email"]})
-    
-    if existing_user:
-        user_id = existing_user["id"]
-        role = existing_user["role"]
-    else:
-        # Create new user
-        user_id = str(uuid.uuid4())
-        role = data.role
-        user = {
-            "id": user_id,
-            "email": google_data["email"],
-            "name": google_data["name"],
-            "picture": google_data.get("picture"),
-            "role": role,
-            "password_hash": None,
-            "auth_provider": "google",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.users.insert_one(user)
-    
-    # Store session
-    session_token = google_data.get("session_token", create_jwt_token(user_id))
-    expires = datetime.now(timezone.utc) + timedelta(days=JWT_EXPIRATION_DAYS)
-    
-    await db.sessions.insert_one({
-        "session_token": session_token,
-        "user_id": user_id,
-        "expires_at": expires.isoformat(),
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
-    
-    response.set_cookie(
-        key="session_token",
-        value=session_token,
-        httponly=True,
-        secure=True,
-        samesite="none",
-        path="/",
-        max_age=JWT_EXPIRATION_DAYS * 24 * 60 * 60
-    )
-    
-    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
-    
-    return UserResponse(
-        id=user_id,
-        email=user_doc["email"],
-        name=user_doc["name"],
-        picture=user_doc.get("picture"),
-        role=user_doc["role"],
-        auth_provider=user_doc["auth_provider"]
     )
 
 @api_router.get("/auth/me", response_model=UserResponse)

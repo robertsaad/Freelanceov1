@@ -1,9 +1,8 @@
 import { useEffect, useState, createContext, useContext } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { Toaster } from "@/components/ui/sonner";
-import { toast } from "sonner";
 
 // Pages
 import Landing from "@/pages/Landing";
@@ -68,12 +67,6 @@ function AuthProvider({ children }) {
     return response.data;
   };
 
-  const loginWithGoogle = async (sessionId, role = "freelancer") => {
-    const response = await axios.post(`${API}/auth/google-session`, { session_id: sessionId, role }, { withCredentials: true });
-    setUser(response.data);
-    return response.data;
-  };
-
   const logout = async () => {
     await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
     setUser(null);
@@ -84,7 +77,7 @@ function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, loginWithGoogle, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, checkAuth }}>
       {children}
     </AuthContext.Provider>
   );
@@ -114,68 +107,11 @@ function ProtectedRoute({ children, roles }) {
   return children;
 }
 
-// Google OAuth Callback Handler
-function OAuthCallback() {
-  const { loginWithGoogle } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [processing, setProcessing] = useState(true);
-
-  useEffect(() => {
-    const processOAuth = async () => {
-      const hash = window.location.hash;
-      const params = new URLSearchParams(hash.slice(1));
-      const sessionId = params.get("session_id");
-      const role = localStorage.getItem("oauth_role") || "freelancer";
-
-      if (sessionId) {
-        try {
-          await loginWithGoogle(sessionId, role);
-          localStorage.removeItem("oauth_role");
-          window.history.replaceState(null, "", window.location.pathname);
-          toast.success("Successfully logged in!");
-          navigate("/dashboard");
-        } catch (error) {
-          toast.error("Authentication failed");
-          navigate("/login");
-        }
-      } else {
-        setProcessing(false);
-      }
-    };
-
-    processOAuth();
-  }, [loginWithGoogle, navigate]);
-
-  if (processing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Processing authentication...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
-
 function AppRoutes() {
-  const location = useLocation();
-
-  // Check for OAuth callback
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes("session_id")) {
-      // OAuth callback detected
-    }
-  }, [location]);
-
   return (
     <Routes>
-      <Route path="/" element={<><OAuthCallback /><Landing /></>} />
-      <Route path="/login" element={<><OAuthCallback /><Login /></>} />
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/freelancers" element={<FreelancersList />} />
       <Route path="/freelancers/:id" element={<FreelancerProfile />} />

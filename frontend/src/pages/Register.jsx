@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Briefcase, Mail, Lock, User, Chrome } from "lucide-react";
+import { Mail, Lock, User } from "lucide-react";
 
 export default function Register() {
   const { register } = useAuth();
@@ -51,12 +51,6 @@ export default function Register() {
     }
   };
 
-  const handleGoogleSignup = (role) => {
-    localStorage.setItem("oauth_role", role);
-    const redirectUrl = encodeURIComponent(window.location.origin);
-    window.location.href = `https://auth.emergentagent.com/?redirect=${redirectUrl}`;
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4" data-testid="register-page">
       <div className="w-full max-w-md">
@@ -74,39 +68,6 @@ export default function Register() {
             <CardDescription>Join our community of professionals</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Google Signup Options */}
-            <div className="space-y-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-12 text-base"
-                onClick={() => handleGoogleSignup("freelancer")}
-                data-testid="google-freelancer-signup-btn"
-              >
-                <Chrome className="mr-2 h-5 w-5" />
-                Sign up as Freelancer
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-12 text-base"
-                onClick={() => handleGoogleSignup("client")}
-                data-testid="google-client-signup-btn"
-              >
-                <Chrome className="mr-2 h-5 w-5" />
-                Sign up as Client
-              </Button>
-            </div>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">Or register with email</span>
-              </div>
-            </div>
-
             {/* Email Registration Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">

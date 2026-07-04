@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Briefcase, Mail, Lock, Chrome } from "lucide-react";
+import { Mail, Lock } from "lucide-react";
 
 export default function Login() {
   const { user, login, loading } = useAuth();
@@ -39,12 +39,6 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = (role) => {
-    localStorage.setItem("oauth_role", role);
-    const redirectUrl = encodeURIComponent(window.location.origin);
-    window.location.href = `https://auth.emergentagent.com/?redirect=${redirectUrl}`;
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -70,39 +64,6 @@ export default function Login() {
             <CardDescription>Sign in to your account to continue</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Google Login Options */}
-            <div className="space-y-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-12 text-base"
-                onClick={() => handleGoogleLogin("freelancer")}
-                data-testid="google-freelancer-btn"
-              >
-                <Chrome className="mr-2 h-5 w-5" />
-                Continue as Freelancer
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-12 text-base"
-                onClick={() => handleGoogleLogin("client")}
-                data-testid="google-client-btn"
-              >
-                <Chrome className="mr-2 h-5 w-5" />
-                Continue as Client
-              </Button>
-            </div>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">Or continue with email</span>
-              </div>
-            </div>
-
             {/* Email Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
