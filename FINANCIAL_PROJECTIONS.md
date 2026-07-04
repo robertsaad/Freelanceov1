@@ -3,8 +3,16 @@
 **Company:** Freelanceo  
 **Document Type:** Financial Projections (5-Year)  
 **Date:** November 29, 2025  
-**Version:** 1.0  
+**Last Updated:** July 4, 2026  
+**Version:** 1.1  
 **Prepared For:** Investor Review & Strategic Planning
+
+> **v1.1 note:** The revenue model is unchanged — flat freelancer subscriptions
+> ($19.99/mo, $149.99/yr) with **0% commission**. Features delivered since v1.0
+> (Contracts & Work Diary, portfolio media uploads, Freelancer Statistics, Account
+> Health, onboarding wizard) are retention/engagement drivers that support — but do
+> not alter — the subscription projections below. Hosting assumptions already use
+> Azure (App Service + Cosmos DB for MongoDB + Static Web Apps + Blob Storage).
 
 ---
 
@@ -1429,8 +1437,8 @@ Expected IRR: 245%
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** November 29, 2025  
+**Document Version:** 1.1
+**Last Updated:** July 4, 2026
 **Prepared By:** Freelanceo Financial Team  
 **Confidential:** For investor and management review only
 

@@ -3,7 +3,8 @@
 **Company:** Freelanceo  
 **Document Type:** Competitive Market Analysis  
 **Date:** November 29, 2025  
-**Version:** 1.0  
+**Last Updated:** July 4, 2026  
+**Version:** 1.1  
 **Purpose:** Strategic positioning and competitive intelligence
 
 ---
@@ -42,9 +43,12 @@ The global freelance marketplace is dominated by commission-based platforms, wit
 **Unique Value Proposition:**
 - Only major platform with **0% commission** subscription model
 - Built-in **social networking** features (feed, following, posts)
+- **Contracts & Work Diary** — lightweight engagement tracking without an escrow/fee layer
+- **Rich media portfolios** (image/video/audio uploads) to showcase real work
+- **Account Health** transparency (standing, Trust & Safety guidance)
 - **Simple pricing** ($19.99/month, $149.99/year)
 - **Quality focus** through subscription barrier
-- **Modern technology** stack (React, FastAPI, MongoDB)
+- **Modern technology** stack (React 19, FastAPI, Azure Cosmos DB for MongoDB) on Azure
 
 ### Competitive Advantage Summary
 
@@ -52,9 +56,11 @@ The global freelance marketplace is dominated by commission-based platforms, wit
 |--------|------------|-------------|-----------|
 | **Pricing Model** | Subscription | Commission | ✅ Freelancers keep 100% |
 | **Social Features** | Yes | No | ✅ Build brand & network |
-| **Transparency** | High | Low | ✅ Simple, clear |
+| **Engagement Tracking** | Contracts + Work Diary | Escrow/fee-based | ✅ No transaction fee |
+| **Media Portfolio** | Image/video/audio | Mostly images/links | ✅ Show real work |
+| **Transparency** | High (Account Health) | Low | ✅ Simple, clear |
 | **Quality Filter** | Subscription | Reviews/Tests | ✅ Serious professionals |
-| **Tech Stack** | Modern | Mixed | ✅ Fast, responsive |
+| **Tech Stack** | Modern (Azure) | Mixed | ✅ Fast, responsive |
 | **User Experience** | Clean | Complex | ✅ Easy to use |
 
 ---
@@ -580,6 +586,7 @@ Revenue Breakdown:
 |---------|------------|--------|--------|--------|----------------|
 | **Freelancer Profiles** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Portfolio Showcase** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Rich Media Portfolio (img/video/audio)** | ✅ | 🚧 | ✅ | 🚧 | 🚧 |
 | **Skills Tags** | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Hourly Rate Display** | ✅ | ✅ | ❌ | ❌ | ✅ |
 | **Availability Status** | ✅ | ✅ | ✅ | ❌ | ✅ |
@@ -625,10 +632,14 @@ Revenue Breakdown:
 | Feature | Freelanceo | Upwork | Fiverr | Toptal | Freelancer.com |
 |---------|------------|--------|--------|--------|----------------|
 | **Time Tracking** | 🚧 | ✅ | ❌ | ✅ | ✅ |
-| **Milestone Payments** | 🚧 | ✅ | ❌ | ✅ | ✅ |
-| **Contracts** | 🚧 | ✅ | ❌ | ✅ | ✅ |
+| **Milestone Payments** | N/A* | ✅ | ❌ | ✅ | ✅ |
+| **Contracts** | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Work Diary (activity log)** | ✅ | ✅ | ❌ | 🚧 | 🚧 |
 | **Invoicing** | 🚧 | ✅ | ❌ | ✅ | ✅ |
 | **Dispute Resolution** | 🚧 | ✅ | ✅ | ✅ | ✅ |
+
+*Freelanceo intentionally has no escrow/milestone payment layer — it charges a flat
+subscription and takes 0% of project value, so freelancers are paid directly by clients.
 
 ### Payment Features
 
@@ -655,6 +666,7 @@ Revenue Breakdown:
 | Feature | Freelanceo | Upwork | Fiverr | Toptal | Freelancer.com |
 |---------|------------|--------|--------|--------|----------------|
 | **Identity Verification** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Account Health / Standing Transparency** | ✅ | 🚧 | 🚧 | 🚧 | 🚧 |
 | **Skills Tests** | 🚧 | ✅ | ✅ | ✅ | ✅ |
 | **Background Checks** | 🚧 | ✅ | ❌ | ✅ | ❌ |
 | **Manual Vetting** | ❌ | ❌ | ✅ (Pro) | ✅ | ❌ |

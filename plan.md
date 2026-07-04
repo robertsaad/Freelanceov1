@@ -1,15 +1,24 @@
 # Freelancer Portfolio Platform - MVP Plan
 
+> **Status (July 4, 2026):** This is the original planning doc. The MVP is now live
+> on Azure (App Service + Cosmos DB for MongoDB + Static Web Apps + Blob Storage)
+> with GitHub Actions CI/CD. Delivered beyond this plan: Contracts & Work Diary,
+> portfolio media uploads, Freelancer Statistics, Account Health, onboarding wizard,
+> Membership & Billing, Admin panel, jobs board, and social feed. See
+> MVP_DOCUMENTATION.md and TECHNICAL_DOCUMENTATION.md for the current state.
+
 ## Overview
 A freelancer portfolio marketplace where:
 - Freelancers can subscribe (paid via Stripe) to showcase their profiles and portfolios
 - Clients can search, filter, and contact freelancers for hiring
 
 ## Tech Stack
-- **Backend**: FastAPI + MongoDB (Motor async driver)
-- **Frontend**: React + Tailwind CSS + Shadcn UI
-- **Authentication**: Emergent Google OAuth + JWT Email/Password
-- **Payments**: Stripe Subscriptions (via emergentintegrations)
+- **Backend**: FastAPI + Azure Cosmos DB for MongoDB (Motor async driver)
+- **Frontend**: React 19 + Tailwind CSS + Shadcn UI (CRACO)
+- **Authentication**: Google OAuth + JWT Email/Password
+- **Payments**: Stripe Subscriptions
+- **Media**: Azure Blob Storage
+- **Hosting/CI-CD**: Azure App Service + Static Web Apps, GitHub Actions
 
 ## Design Theme
 - Clean light theme with modern aesthetics

@@ -1,7 +1,7 @@
 # Freelanceo - Technical Documentation
 
-**Version:** 1.0  
-**Last Updated:** November 29, 2025  
+**Version:** 1.1  
+**Last Updated:** July 4, 2026  
 **Tagline:** Where talent meets opportunity
 
 ---
@@ -26,14 +26,22 @@
 Freelanceo is a comprehensive freelance marketplace platform connecting clients with talented freelancers. The platform provides a subscription-based model for freelancers to showcase their work, find opportunities, and build their professional network.
 
 ### Key Metrics
-- **User Roles:** Client, Freelancer
-- **Authentication Methods:** Email/Password, Google OAuth (Emergent Managed)
-- **Subscription Model:** Monthly ($19.99), Yearly ($149.99)
+- **User Roles:** Client, Freelancer, Admin
+- **Authentication Methods:** Email/Password, Google OAuth
+- **Subscription Model:** Monthly ($19.99), Yearly ($149.99) — no service fee / 0% commission
 - **Platform Type:** Web Application (Mobile-ready via Capacitor)
+- **Hosting:** Microsoft Azure (App Service + Cosmos DB for MongoDB + Static Web Apps + Blob Storage)
+- **Delivered since v1.0:** Contracts & Work Diary, Freelancer Statistics, portfolio media uploads, Account Health, onboarding wizard, Membership & Billing, Admin panel
 
 ---
 
 ## System Architecture
+
+> The diagram below shows the logical layering. In production this maps to the
+> **Azure test environment**: the frontend is served by Azure Static Web Apps, the
+> backend by Azure App Service, the database by Azure Cosmos DB for MongoDB, and
+> media by Azure Blob Storage. See the [Deployment Architecture](#deployment-architecture)
+> section for the concrete Azure topology.
 
 ### High-Level Architecture
 
@@ -103,12 +111,20 @@ src/
 │   ├── Dashboard.jsx    # User dashboard
 │   ├── FreelancersList.jsx
 │   ├── FreelancerProfile.jsx
+│   ├── FreelancerOnboarding.jsx  # Multi-step onboarding wizard
 │   ├── JobsList.jsx     # Job board
 │   ├── JobDetail.jsx
 │   ├── PostJob.jsx
 │   ├── Feed.jsx         # Social feed
 │   ├── Messages.jsx
 │   ├── Notifications.jsx
+│   ├── HiringRequests.jsx
+│   ├── Contracts.jsx        # Contracts list
+│   ├── ContractDetail.jsx   # Contract detail + work diary
+│   ├── Statistics.jsx       # Freelancer stats
+│   ├── AccountHealth.jsx    # Account health
+│   ├── Billing.jsx          # Membership & billing
+│   ├── Admin.jsx            # Admin panel
 │   ├── Pricing.jsx
 │   └── EditProfile.jsx
 ├── hooks/
@@ -121,12 +137,17 @@ backend/
 ├── server.py            # Main FastAPI application
 │   ├── Authentication endpoints
 │   ├── User management
-│   ├── Freelancer profiles
+│   ├── Freelancer profiles & statistics
 │   ├── Job board
 │   ├── Social features (Follow/Feed/Posts)
 │   ├── Messaging
+│   ├── Hiring requests
+│   ├── Contracts & work diary
+│   ├── Media uploads (Azure Blob)
+│   ├── Account health
 │   ├── Payments (Stripe)
-│   └── Notifications
+│   ├── Notifications
+│   └── Admin API
 ├── requirements.txt     # Python dependencies
 └── .env                # Environment configuration
 ```
@@ -138,11 +159,11 @@ backend/
 ### Frontend
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| React | 18.x | UI Framework |
-| React Router | 6.x | Client-side routing |
+| React | 19.x | UI Framework |
+| React Router | 7.x | Client-side routing |
 | Axios | 1.x | HTTP client |
-| TailwindCSS | 3.x | Styling framework |
-| Shadcn UI | Latest | Component library |
+| TailwindCSS | 3.x (CRACO) | Styling framework |
+| Shadcn UI / Radix | Latest | Component library |
 | Lucide React | Latest | Icon library |
 | Sonner | Latest | Toast notifications |
 | Capacitor | Latest | Native mobile support |
@@ -161,21 +182,22 @@ backend/
 ### Database
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| MongoDB | 7.0+ | Primary database |
+| Azure Cosmos DB for MongoDB | serverless (Mongo 7.0 API) | Primary database |
 
 ### Infrastructure
 | Technology | Purpose |
 |------------|---------|
-| Kubernetes | Container orchestration |
-| Supervisor | Process management |
-| Nginx/Ingress | Reverse proxy |
+| Azure App Service (Linux, B1) | Backend hosting (gunicorn + uvicorn) |
+| Azure Static Web Apps | Frontend hosting + global CDN |
+| Azure Blob Storage | Portfolio media storage |
+| GitHub Actions | CI/CD (push-to-deploy) |
 
 ### External Services
 | Service | Purpose |
 |---------|---------|
 | Stripe | Payment processing |
-| Emergent Auth | Google OAuth management |
-| Posthog | Analytics & tracking |
+| Google OAuth | Social sign-in |
+| Posthog | Analytics & tracking (optional) |
 
 ---
 
@@ -468,11 +490,50 @@ backend/
 - Related profiles
 - Similar jobs
 
+### 11. Contracts & Work Diary
+
+- Contract auto-created when a freelancer **accepts** a hiring request (client is notified)
+- Statuses: `active` → `completed` / `ended`
+- Contracts list with summary counts (active/completed/total), search, filter, sort
+- Contract detail with a **work diary** (dated notes; add/list/delete own entries)
+- Participant-only authorization (client or freelancer on the contract)
+- No earnings/withdraw surface (subscription-only, 0% commission)
+
+### 12. Freelancer Statistics
+
+- Profile views, followers, average rating, review count, opportunity metrics
+- Freelancer-only (`/dashboard/stats`), backed by `GET /api/freelancers/stats/me`
+
+### 13. Portfolio Media Uploads
+
+- Upload images / video / audio (up to 50 MB) to **Azure Blob Storage**
+- Rendered inline in the profile editor and public profile
+- `POST /api/uploads`, `GET /api/uploads/file/{blob_name}`
+
+### 14. Account Health
+
+- Platform access status, account-standing gauge, enforcement history (scaffold), Trust & Safety tips
+- Freelancer-only (`/dashboard/account-health`), backed by `GET /api/account-health/me`
+
+### 15. Onboarding & Billing
+
+- Multi-step freelancer onboarding wizard (`/onboarding`)
+- Membership & Billing page (`/dashboard/billing`) with plan selection + profile-completion widget
+
+### 16. Admin Panel
+
+- Admin-only (`/admin`): platform stats, user/freelancer/job/payment management, category management
+- Backed by `GET/POST/DELETE /api/admin/*`
+
 ---
 
 ## Database Architecture
 
-### Database: MongoDB
+### Database: Azure Cosmos DB for MongoDB (serverless)
+
+> MongoDB 7.0-compatible API. 14 collections. Portfolio media is stored in Azure
+> Blob Storage (not in the database). A `contracts` collection was added in v1.1
+> (see below).
 
 ### Collections Schema
 
@@ -485,7 +546,7 @@ backend/
   name: String,
   password_hash: String | null,   // null for OAuth users
   picture: String | null,         // Profile picture URL
-  role: String,                   // "client" | "freelancer"
+  role: String,                   // "client" | "freelancer" | "admin"
   auth_provider: String,          // "email" | "google"
   created_at: ISOString,
   updated_at: ISOString
@@ -745,6 +806,40 @@ backend/
 // - status
 ```
 
+#### 14. contracts
+```javascript
+{
+  _id: ObjectId,
+  id: String (UUID),
+  hiring_request_id: String (UUID),   // FK to hiring_requests.id
+  client_id: String (UUID),           // FK to users.id
+  freelancer_id: String (UUID),       // FK to freelancer_profiles.id
+  freelancer_user_id: String (UUID),  // FK to users.id
+  title: String,
+  description: String,
+  budget: Number,
+  status: String,                     // "active" | "completed" | "ended"
+  diary: [                            // embedded work-diary entries
+    {
+      id: String (UUID),
+      author_id: String (UUID),       // FK to users.id
+      note: String,
+      entry_date: ISOString,
+      created_at: ISOString
+    }
+  ],
+  started_at: ISOString,
+  ended_at: ISOString | null,
+  created_at: ISOString,
+  updated_at: ISOString
+}
+
+// Indexes:
+// - client_id
+// - freelancer_user_id
+// - status
+```
+
 ### Database Relationships
 
 ```
@@ -788,10 +883,39 @@ posts
 
 ### Base URL
 - **Development:** `http://localhost:8001`
-- **Production:** `https://talent-market-17.preview.emergentagent.com`
+- **Azure test environment:** `https://freelanceo-api-4uaszdvubu3ck.azurewebsites.net`
 
 ### API Prefix
 All API endpoints are prefixed with `/api`
+
+### New endpoints (v1.1)
+```
+Contracts
+  GET    /api/contracts                       # list (status, search, sort, order)
+  GET    /api/contracts/summary               # active/completed/ended/total counts
+  GET    /api/contracts/{id}                  # single contract + diary
+  PUT    /api/contracts/{id}                  # update status (active→completed/ended)
+  POST   /api/contracts/{id}/diary            # add a dated diary entry
+  DELETE /api/contracts/{id}/diary/{entry_id} # delete own diary entry
+
+Media & health
+  POST   /api/uploads                         # upload portfolio media to Blob Storage
+  GET    /api/uploads/file/{blob_name}        # stream a stored media file
+  GET    /api/freelancers/stats/me            # freelancer statistics
+  GET    /api/account-health/me               # account health
+
+Admin (admin role only)
+  GET    /api/admin/stats
+  GET/DELETE /api/admin/users            (+ /{id})
+  GET/DELETE /api/admin/freelancers      (+ /{id})
+  GET/DELETE /api/admin/jobs             (+ /{id})
+  GET    /api/admin/payments
+  GET/POST/DELETE /api/admin/categories  (+ /seed)
+  POST   /api/admin/bootstrap
+
+Health
+  GET    /api/health                          # service health probe
+```
 
 ---
 
@@ -1262,67 +1386,87 @@ Mark notification as read
 
 ## Deployment Architecture
 
-### Kubernetes Deployment
+The platform runs on **Microsoft Azure** (dev/test subscription). Deployment is
+fully automated via GitHub Actions: pushing to `main` builds and deploys both the
+backend (App Service) and the frontend (Static Web Apps).
 
-#### Services
-```yaml
-Frontend Service:
-  - Port: 3000
-  - Type: ClusterIP
-  - Hot reload enabled
-  - Supervisor managed
+### Azure Test Environment (LIVE)
 
-Backend Service:
-  - Port: 8001
-  - Type: ClusterIP
-  - Hot reload enabled
-  - Supervisor managed
+```
+                         Internet
+                            │
+        ┌───────────────────┴────────────────────┐
+        ▼                                         ▼
+┌─────────────────────────────┐      ┌─────────────────────────────┐
+│  Azure Static Web Apps       │      │  Azure App Service (Linux)   │
+│  React SPA (global CDN)       │─────►│  FastAPI  (gunicorn+uvicorn) │
+│  proud-dune-0f5f5910f...      │ /api │  freelanceo-api-4uaszdvubu3ck│
+│  Region: East US 2 (global)   │      │  SKU: B1  Region: Sweden C.  │
+└─────────────────────────────┘      └──────────────┬──────────────┘
+                                                     │
+                          ┌──────────────────────────┼──────────────────────────┐
+                          ▼                           ▼                          ▼
+             ┌───────────────────────┐   ┌───────────────────────┐   ┌───────────────────────┐
+             │ Azure Cosmos DB        │   │ Azure Blob Storage     │   │ External services      │
+             │ for MongoDB (serverless)│   │ (portfolio media)      │   │ Stripe · Google OAuth  │
+             │ freelanceo-db-...       │   │                        │   │                        │
+             │ Region: Sweden Central  │   │                        │   │                        │
+             └───────────────────────┘   └───────────────────────┘   └───────────────────────┘
 
-MongoDB:
-  - Port: 27017
-  - Local instance
-  - No authentication (development)
+Resource Group: freelanceo-test-rg   ·   CI/CD: GitHub Actions (push-to-deploy on main)
 ```
 
-#### Ingress Rules
-```yaml
-Rules:
-  - Path: /api/*
-    Backend: backend-service:8001
-  
-  - Path: /*
-    Backend: frontend-service:3000
+#### Azure Resources
+| Component | Azure service | Name / SKU | Region |
+|-----------|---------------|------------|--------|
+| Frontend | Static Web Apps | `freelanceo-web-4uaszdvubu3ck` (hostname `proud-dune-0f5f5910f.7.azurestaticapps.net`) | East US 2 (served globally) |
+| Backend | App Service (Linux) | `freelanceo-api-4uaszdvubu3ck` / B1 | Sweden Central |
+| Database | Cosmos DB for MongoDB (serverless) | `freelanceo-db-4uaszdvubu3ck` | Sweden Central |
+| Media | Blob Storage | portfolio uploads container | Sweden Central |
+| CI/CD | GitHub Actions | `azure-backend.yml`, `azure-frontend.yml` | github.com/robertsaad/Freelanceov1 |
+
+#### CI/CD flow
+```
+git push origin main
+   ├─► azure-backend.yml  → build + zip-deploy FastAPI to App Service
+   └─► azure-frontend.yml → yarn build (REACT_APP_BACKEND_URL injected) → deploy to Static Web Apps
 ```
 
 ### Environment Variables
 
-#### Frontend (.env)
+#### Frontend (build-time)
 ```
-REACT_APP_BACKEND_URL=https://talent-market-17.preview.emergentagent.com
+REACT_APP_BACKEND_URL=https://freelanceo-api-4uaszdvubu3ck.azurewebsites.net
 ```
+> Baked into the bundle at build time by the frontend workflow.
 
-#### Backend (.env)
+#### Backend (App Service application settings)
 ```
-MONGO_URL=mongodb://127.0.0.1:27017/
+MONGO_URL=<Azure Cosmos DB for MongoDB connection string>
 DB_NAME=freelancer_platform
-JWT_SECRET=super_secret_key
+JWT_SECRET=<secret>
 JWT_ALGORITHM=HS256
 STRIPE_API_KEY=sk_test_...
+CORS_ORIGINS=https://proud-dune-0f5f5910f.7.azurestaticapps.net
+AZURE_STORAGE_CONNECTION_STRING=<blob storage connection string>
 ```
 
-### Production Considerations
-
-#### Azure Deployment (Configured)
-- ARM templates created
-- GitHub Actions CI/CD pipelines
-- Azure App Service for backend
-- Azure Static Web Apps for frontend
-- Azure Cosmos DB (MongoDB API)
+### Deployment notes (learned)
+- App Service SCM basic-auth must be enabled for publish-profile deploys.
+- CORS is enforced at BOTH the app (Starlette, `CORS_ORIGINS`) and Azure platform
+  layer (`az webapp cors`); the platform layer wins. After changing platform CORS
+  the web app must be **restarted** for the change to take effect.
+- Cosmos DB serverless requires the `EnableServerless` capability; Mongo databases
+  must not specify fixed throughput.
 
 #### Capacitor Mobile Build
 - iOS platform configured
 - Android platform configured
 - Native build scripts ready
+
+> **Original development environment:** the app was first built on a Kubernetes /
+> Emergent preview (frontend:3000, backend:8001, local MongoDB). That setup is
+> retained only for local development reference.
 
 ---
 

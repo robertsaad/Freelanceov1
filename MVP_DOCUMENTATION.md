@@ -1,9 +1,17 @@
 # Freelanceo - MVP (Minimum Viable Product) Documentation
 
-**Version:** 1.0 MVP  
+**Version:** 1.1 MVP  
 **Launch Date:** November 29, 2025  
-**Status:** ✅ Live & Production Ready  
+**Last Updated:** July 4, 2026  
+**Status:** ✅ Live on Azure (test environment)  
 **Tagline:** Where talent meets opportunity
+
+> **What's new in v1.1:** Contracts & Work Diary, Freelancer Statistics, portfolio
+> media uploads (Azure Blob Storage), Account Health, a multi-step freelancer
+> onboarding wizard, Membership & Billing page, an Admin panel, and email sign-up
+> alongside Google. The platform is now deployed to Azure (App Service + Cosmos DB
+> for MongoDB + Static Web Apps) with GitHub Actions CI/CD. See the
+> "New in v1.1" section and CHANGELOG.md for details.
 
 ---
 
@@ -402,17 +410,100 @@ Subscribed freelancers see:
 
 ---
 
+## New in v1.1
+
+#### 11. Contracts & Work Diary
+
+**Automatic contract creation**
+- A contract is created automatically when a freelancer **accepts** a hiring request
+- Links the client, freelancer, title, description and budget from the request
+- Client receives a notification when the contract starts
+- Marked **completed** when the underlying request is completed
+
+**Contracts list** (`/dashboard/contracts`)
+- Summary strip: Active / Completed / Total counts (no earnings — subscription-only model)
+- Search, status filter, and sort by start date
+- Contract cards linking to the detail view
+- Empty state for users with no contracts yet
+
+**Contract detail** (`/dashboard/contracts/:id`)
+- Status badge (active = green, completed = blue, ended = gray)
+- "Mark complete" / "End" actions (available while active)
+- **Work Diary:** dated activity log where participants add notes; entries listed
+  newest-first; authors can delete their own entries
+- Participant-only access (client or freelancer on the contract)
+
+---
+
+#### 12. Freelancer Statistics
+
+**Statistics page** (`/dashboard/stats`, freelancers only)
+- Profile views, follower count, average rating and review count
+- Opportunity/engagement metrics
+- No earnings shown (consistent with the no-service-fee model)
+
+---
+
+#### 13. Portfolio Media Uploads
+
+**Direct media uploads** (supersedes the v1.0 URL-only limitation)
+- Upload images, video, and audio (up to 50 MB per file)
+- Files stored in **Azure Blob Storage**; served back via the API
+- Media rendered inline in the profile editor and on the public profile
+- Endpoints: `POST /api/uploads`, `GET /api/uploads/file/{blob_name}`
+
+---
+
+#### 14. Account Health
+
+**Account Health page** (`/dashboard/account-health`, freelancers only)
+- Platform access status and account standing gauge
+- Enforcement history (scaffold)
+- Trust & Safety guidance and tips
+- Endpoint: `GET /api/account-health/me`
+
+---
+
+#### 15. Freelancer Onboarding Wizard
+
+**Multi-step onboarding** (`/onboarding`, freelancers only)
+- Upwork-style guided flow (role, professional info, skills, rate, bio, portfolio)
+- Step-specific validation with clear minimum-bio messaging
+- Feeds directly into the freelancer profile
+
+---
+
+#### 16. Membership & Billing
+
+**Billing page** (`/dashboard/billing`, freelancers only)
+- Current membership status and expiry
+- Plan selection (monthly / yearly) and Stripe checkout entry point
+- Profile-completion widget prompting freelancers to finish their profile
+- No service-fee model reaffirmed (freelancers keep 100% of what they earn)
+
+---
+
+#### 17. Admin Panel
+
+**Admin dashboard** (`/admin`, admin role only)
+- Platform stats overview
+- User, freelancer, job and payment management (view / remove)
+- Category management (create / delete / seed)
+- Endpoints under `GET/POST/DELETE /api/admin/*`
+
+---
+
 ## Technical Specifications
 
 ### Technology Stack
 
 **Frontend**
 ```
-React: 18.x
-React Router: 6.x
+React: 19.x
+React Router: 7.x
 Axios: 1.x
-TailwindCSS: 3.x
-Shadcn UI: Latest
+TailwindCSS: 3.x (CRACO build)
+Shadcn UI / Radix: Latest
 Lucide Icons: Latest
 Sonner: Latest (Toasts)
 Capacitor: Latest (Mobile)
@@ -431,16 +522,18 @@ HTTPX: Latest
 
 **Database**
 ```
-MongoDB: 7.0+
-Collections: 13
+MongoDB API: Azure Cosmos DB (serverless) / MongoDB 7.0 compatible
+Collections: 14
 Total indexes: 25+
 ```
 
-**Infrastructure**
+**Infrastructure (Azure test environment)**
 ```
-Kubernetes: Container orchestration
-Supervisor: Process management
-Nginx/Ingress: Reverse proxy
+Azure App Service (Linux, B1): FastAPI backend (gunicorn + uvicorn)
+Azure Cosmos DB for MongoDB (serverless): database
+Azure Static Web Apps: React frontend (global CDN)
+Azure Blob Storage: portfolio media
+GitHub Actions: CI/CD (push-to-deploy)
 ```
 
 ---
@@ -470,36 +563,31 @@ Nginx/Ingress: Reverse proxy
 
 ### Architecture Overview
 
-**Deployment Architecture**
+**Deployment Architecture (Azure test environment)**
 ```
-Frontend (React) ──► Kubernetes Ingress ──► Backend (FastAPI)
-                                                   │
-                                                   ▼
-                                              MongoDB
-                                                   │
-                                                   ▼
-                                          External Services
-                                          (Stripe, Emergent)
+React SPA (Azure Static Web Apps + CDN)
+        │  HTTPS  (REACT_APP_BACKEND_URL baked at build time)
+        ▼
+FastAPI (Azure App Service, Linux B1)  ──►  Azure Cosmos DB for MongoDB (serverless)
+        │                                   
+        ├──►  Azure Blob Storage (portfolio media)
+        └──►  External services (Stripe, Google OAuth)
 ```
 
 **Request Flow**
 ```
-User Request ──► Ingress Controller
-                      │
-        ┌─────────────┴─────────────┐
-        ▼                           ▼
-    Frontend:3000              Backend:8001
-    (React SPA)                (FastAPI)
-                                    │
-                                    ▼
-                                MongoDB
+User ──► Static Web App (frontend)
+          │  axios → https://<app-service>/api/*
+          ▼
+     App Service (FastAPI) ──► Cosmos DB (Mongo API)
+                              └► Blob Storage / Stripe
 ```
 
 ---
 
 ### Database Schema (MVP)
 
-**Core Collections (13 total)**
+**Core Collections (14 total)**
 
 1. **users** - User accounts and authentication
 2. **freelancer_profiles** - Freelancer information and subscriptions
@@ -514,6 +602,9 @@ User Request ──► Ingress Controller
 11. **notifications** - User notifications
 12. **sessions** - Authentication sessions
 13. **payment_transactions** - Stripe payment records
+14. **contracts** - Engagements created from accepted hiring requests (embeds work-diary entries)
+
+> Portfolio media (images/video/audio) is stored in **Azure Blob Storage**, not in MongoDB.
 
 **Relationships**
 - users ↔ freelancer_profiles (1:1)
@@ -584,6 +675,29 @@ User Request ──► Ingress Controller
 **Payments (2 endpoints)**
 - POST /api/payments/create-checkout-session
 - GET /api/payments/success
+
+**Contracts (6 endpoints)**
+- GET /api/contracts
+- GET /api/contracts/summary
+- GET /api/contracts/:id
+- PUT /api/contracts/:id
+- POST /api/contracts/:id/diary
+- DELETE /api/contracts/:id/diary/:entry_id
+
+**Media & Health (4 endpoints)**
+- POST /api/uploads
+- GET /api/uploads/file/:blob_name
+- GET /api/freelancers/stats/me
+- GET /api/account-health/me
+
+**Admin (12+ endpoints)**
+- GET /api/admin/stats
+- GET/DELETE /api/admin/users
+- GET/DELETE /api/admin/freelancers
+- GET/DELETE /api/admin/jobs
+- GET /api/admin/payments
+- GET/POST/DELETE /api/admin/categories (+ seed)
+- POST /api/admin/bootstrap
 
 ---
 
@@ -660,10 +774,9 @@ User Request ──► Ingress Controller
 - No WebSocket support yet
 
 **2. File Upload**
-- No direct file upload (MVP)
-- Only URL input for images
-- Profile pictures from Google OAuth only
-- Manual image hosting required
+- Portfolio media uploads (image/video/audio, up to 50 MB) supported via Azure Blob Storage
+- Profile pictures still imported from Google OAuth
+- No drag-and-drop reordering of media yet
 
 **3. Content Management**
 - Cannot edit posts after creation
@@ -700,50 +813,48 @@ User Request ──► Ingress Controller
 See TECHNICAL_DOCUMENTATION.md for complete roadmap.
 
 **Priority 1 (Next Sprint)**
-- Profile photo upload
-- Real-time messaging
+- Real-time messaging (WebSockets)
 - Edit posts functionality
-- Advanced search
+- Advanced / fuzzy search
+- Drag-and-drop portfolio media reordering
 
-**Priority 2 (Q1 2026)**
-- Contract management
-- Time tracking
-- Invoice system
-- Native mobile apps
+**Priority 2 (Q3 2026)**
+- Time tracking on contracts
+- Invoice / receipt generation
+- Native mobile app store releases
+- Production hardening (custom domain, Key Vault, backups)
 
-**Priority 3 (Q2 2026)**
+**Priority 3 (Q4 2026)**
 - Team accounts
-- Advanced analytics
+- Advanced analytics dashboards
 - Video conferencing
 - AI-powered matching
+
+> Delivered since v1.0: contract management (Contracts & Work Diary), portfolio
+> media uploads, freelancer statistics, account health, admin panel.
 
 ---
 
 ## Deployment Information
 
-### Current Deployment
+### Current Deployment (Azure test environment — LIVE)
 
-**Environment:** Kubernetes (Development)
-- Frontend: Port 3000
-- Backend: Port 8001
-- MongoDB: Port 27017 (local)
+**Environment:** Microsoft Azure (dev/test subscription)
+- **Resource Group:** `freelanceo-test-rg`
+- **Backend:** Azure App Service (Linux, B1) — FastAPI via gunicorn + uvicorn, API under `/api` (Sweden Central)
+- **Database:** Azure Cosmos DB for MongoDB (serverless) (Sweden Central)
+- **Frontend:** Azure Static Web Apps (served globally via CDN; region East US 2)
+- **Media:** Azure Blob Storage (portfolio uploads)
+- **CI/CD:** GitHub Actions — `azure-backend.yml` + `azure-frontend.yml`, push-to-deploy on `main`
 
 **URLs:**
-- Frontend: https://talent-market-17.preview.emergentagent.com
-- Backend API: https://talent-market-17.preview.emergentagent.com/api
+- Frontend (Static Web App): https://proud-dune-0f5f5910f.7.azurestaticapps.net
+- Backend API: https://freelanceo-api-4uaszdvubu3ck.azurewebsites.net/api
+- Repository: https://github.com/robertsaad/Freelanceov1
 
-### Production Deployment (Configured)
-
-**Azure Cloud Infrastructure**
-- Frontend: Azure Static Web Apps
-- Backend: Azure App Service
-- Database: Azure Cosmos DB (MongoDB API)
-- CDN: Azure CDN
-- CI/CD: GitHub Actions
-
-**ARM Templates:** ✅ Ready
-**CI/CD Pipelines:** ✅ Configured
-**Deployment Guide:** ✅ Available
+> This is a dev/test deployment on a Microsoft corporate (MCAP) subscription.
+> A production hardening pass (custom domain, TLS, scaling tier, secrets in Key
+> Vault, backups) is a post-MVP step.
 
 ---
 

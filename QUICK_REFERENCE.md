@@ -23,6 +23,11 @@ Profile: Full-Stack Developer & UI/UX Designer
 
 ## Quick Access URLs
 
+**Live (Azure test environment)**
+- Frontend: https://proud-dune-0f5f5910f.7.azurestaticapps.net
+- Backend API: https://freelanceo-api-4uaszdvubu3ck.azurewebsites.net/api
+- Repo: https://github.com/robertsaad/Freelanceov1
+
 | Page | URL | Access |
 |------|-----|--------|
 | Homepage | `/` | Public |
@@ -35,8 +40,16 @@ Profile: Full-Stack Developer & UI/UX Designer
 | Messages | `/dashboard/messages` | Authenticated |
 | Notifications | `/notifications` | Authenticated |
 | Pricing | `/pricing` | Public |
+| Onboarding | `/onboarding` | Freelancers only |
 | Edit Profile | `/dashboard/profile` | Freelancers only |
+| Billing | `/dashboard/billing` | Freelancers only |
+| Statistics | `/dashboard/stats` | Freelancers only |
+| Account Health | `/dashboard/account-health` | Freelancers only |
+| Contracts | `/dashboard/contracts` | Authenticated |
+| Contract Detail | `/dashboard/contracts/:id` | Participants |
+| Hiring Requests | `/dashboard/requests` | Authenticated |
 | Post Job | `/jobs/post` | Clients only |
+| Admin | `/admin` | Admin only |
 
 ---
 
@@ -133,6 +146,24 @@ Profile: Full-Stack Developer & UI/UX Designer
 - [x] Written reviews
 - [x] Average rating calculation
 - [x] Review count display
+
+### ✅ Contracts & Work Diary (v1.1)
+- [x] Auto-create contract when a hiring request is accepted
+- [x] Contracts list with summary counts, search, filter, sort
+- [x] Contract detail with status actions (complete / end)
+- [x] Work diary (add/list/delete dated notes)
+
+### ✅ Freelancer Tools (v1.1)
+- [x] Multi-step onboarding wizard
+- [x] Statistics dashboard
+- [x] Account Health page
+- [x] Membership & Billing page + profile-completion widget
+- [x] Portfolio media uploads (image/video/audio via Azure Blob)
+
+### ✅ Admin (v1.1)
+- [x] Platform stats
+- [x] Manage users / freelancers / jobs / payments
+- [x] Manage categories (create/delete/seed)
 
 ---
 

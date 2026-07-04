@@ -5,7 +5,13 @@
 **Expansion Market:** Gulf Cooperation Council (GCC)  
 **Currency:** USD (Primary)  
 **Document Date:** November 29, 2025  
-**Version:** 1.0 - Lebanon Edition
+**Last Updated:** July 4, 2026  
+**Version:** 1.1 - Lebanon Edition
+
+> **v1.1 note:** Revenue model unchanged (localized subscription pricing, 0%
+> commission). Features delivered since v1.0 — Contracts & Work Diary, portfolio
+> media uploads, Freelancer Statistics, Account Health — support retention without
+> changing these projections. Platform is hosted on Azure.
 
 ---
 

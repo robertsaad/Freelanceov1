@@ -7,7 +7,13 @@
 **Business Model:** B2C Subscription-based Platform  
 **Founded:** November 2025  
 **Document Date:** November 29, 2025  
-**Version:** 1.0 - Lebanon Edition
+**Last Updated:** July 4, 2026  
+**Version:** 1.1 - Lebanon Edition
+
+> **v1.1 note:** MVP is live on Azure. Localized subscription pricing and 0%
+> commission are unchanged. Features shipped since v1.0: Contracts & Work Diary,
+> portfolio media uploads, Freelancer Statistics, Account Health, onboarding
+> wizard, Membership & Billing, and an Admin panel.
 
 ---
 

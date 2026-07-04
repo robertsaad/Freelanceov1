@@ -6,6 +6,31 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-04 — Documentation refresh (v1.1)
+
+**Summary:** Updated all project documents to match the current application and the
+live Azure test environment. Added the Azure test-environment architecture, brought
+the feature lists up to date (Contracts & Work Diary, Freelancer Statistics,
+portfolio media uploads, Account Health, onboarding wizard, Membership & Billing,
+Admin panel), and reaffirmed the subscription-only (0% commission) model.
+
+**Docs updated**
+- `MVP_DOCUMENTATION.md` — v1.1: new-features section, updated collections (14),
+  endpoints, tech stack (React 19), and Azure deployment info.
+- `TECHNICAL_DOCUMENTATION.md` — v1.1: Azure deployment architecture + CI/CD,
+  new feature sections, `contracts` collection schema, v1.1 endpoint summary.
+- `ARCHITECTURE_DIAGRAMS.md` — added the **Azure Test Environment Architecture**
+  diagram and CI/CD pipeline; kept the original dev diagram for reference.
+- `COMPETITIVE_ANALYSIS.md` — v1.1: Contracts/Work Diary, media portfolio and
+  Account Health added to positioning and the feature-comparison matrix.
+- `FINANCIAL_PROJECTIONS.md` / `FINANCIAL_PROJECTIONS_LEBANON.md` — v1.1 notes
+  (model unchanged; features support retention; Azure hosting).
+- `BUSINESS_PLAN.md` / `BUSINESS_PLAN_LEBANON.md` — v1.1 notes + enriched solution.
+- `README.md`, `QUICK_REFERENCE.md`, `plan.md` — refreshed features, routes, URLs,
+  and tech stack.
+
+---
+
 ## 2026-07-04 — Contracts & Work Diary
 
 **Summary:** Added a full Contracts feature so freelancers and clients can track

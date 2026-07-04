@@ -6,7 +6,13 @@
 **Business Model:** B2C Subscription-based Platform  
 **Founded:** November 2025  
 **Document Date:** November 29, 2025  
-**Version:** 1.0
+**Last Updated:** July 4, 2026  
+**Version:** 1.1
+
+> **v1.1 note:** MVP is live on Azure (App Service + Cosmos DB for MongoDB + Static
+> Web Apps + Blob Storage) with GitHub Actions CI/CD. Features shipped since v1.0:
+> Contracts & Work Diary, portfolio media uploads, Freelancer Statistics, Account
+> Health, freelancer onboarding wizard, Membership & Billing, and an Admin panel.
 
 ---
 
@@ -33,6 +39,9 @@ Freelanceo offers a **simplified, subscription-based marketplace** that:
 - **Eliminates commission fees** on projects
 - **Flat monthly subscription** ($19.99) for unlimited job applications
 - **Social networking features** to build personal brand and following
+- **Contracts & Work Diary** for lightweight engagement tracking (no escrow/fee layer)
+- **Rich media portfolios** (image/video/audio) to showcase real work
+- **Account Health transparency** (standing + Trust & Safety guidance)
 - **Clean, modern interface** focused on user experience
 - **Direct communication** between clients and freelancers
 - **Quality over quantity** through subscription barriers

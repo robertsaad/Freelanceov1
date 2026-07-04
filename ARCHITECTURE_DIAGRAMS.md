@@ -1,6 +1,84 @@
 # Freelanceo - Architecture Diagrams
 
-## System Architecture Overview
+> **Deployment status:** Freelanceo is deployed to the **Azure test environment**
+> (see the section directly below). The generic/logical diagram that follows the
+> Azure section reflects the original development environment (Kubernetes / local
+> MongoDB) and is kept for reference only.
+
+---
+
+## Azure Test Environment Architecture (LIVE)
+
+This is the actual running topology on Microsoft Azure (dev/test subscription).
+Everything deploys automatically from GitHub via GitHub Actions on push to `main`.
+
+```
+                                   ┌──────────────┐
+                                   │   End users   │
+                                   │ (browser /    │
+                                   │  Capacitor)   │
+                                   └───────┬───────┘
+                                           │ HTTPS
+                                           ▼
+              ┌───────────────────────────────────────────────────────┐
+              │              Azure Static Web Apps (CDN)               │
+              │  React 19 SPA (built with CRACO)                        │
+              │  Host: proud-dune-0f5f5910f.7.azurestaticapps.net       │
+              │  Region: East US 2 (content served globally via CDN)    │
+              └───────────────────────────┬───────────────────────────┘
+                                          │ axios → REACT_APP_BACKEND_URL/api/*
+                                          │ (baked in at build time)
+                                          ▼
+              ┌───────────────────────────────────────────────────────┐
+              │            Azure App Service (Linux, B1)               │
+              │  FastAPI (gunicorn + uvicorn), routes under /api        │
+              │  Name: freelanceo-api-4uaszdvubu3ck                     │
+              │  Region: Sweden Central                                 │
+              │  CORS: app-level (Starlette) + Azure platform layer     │
+              └───┬───────────────────┬───────────────────┬───────────┘
+                  │                   │                   │
+                  ▼                   ▼                   ▼
+   ┌───────────────────────┐ ┌─────────────────┐ ┌───────────────────────┐
+   │ Azure Cosmos DB for    │ │ Azure Blob       │ │ External services      │
+   │ MongoDB (serverless)   │ │ Storage          │ │ • Stripe (payments)    │
+   │ freelanceo-db-...       │ │ portfolio media  │ │ • Google OAuth (login) │
+   │ 14 collections          │ │ (img/video/audio)│ │                        │
+   │ Region: Sweden Central  │ │                  │ │                        │
+   └───────────────────────┘ └─────────────────┘ └───────────────────────┘
+
+   Resource Group: freelanceo-test-rg
+   Subscription:   Microsoft MCAP (dev/test only)
+```
+
+### CI/CD pipeline
+
+```
+Developer ──► git push origin main ──► GitHub (robertsaad/Freelanceov1)
+                                             │
+                    ┌────────────────────────┴────────────────────────┐
+                    ▼                                                  ▼
+        .github/workflows/azure-backend.yml            .github/workflows/azure-frontend.yml
+        • build FastAPI package                        • yarn build (REACT_APP_BACKEND_URL injected)
+        • zip-deploy to App Service                    • deploy static assets to Static Web Apps
+        (secret: AZURE_WEBAPP_PUBLISH_PROFILE)         (secret: AZURE_STATIC_WEB_APPS_API_TOKEN)
+```
+
+### Why the regions differ
+- Compute + database are in **Sweden Central** (the target test region had 0 VM
+  quota for the B1 tier, so a region with available quota was used).
+- The Static Web App is registered in **East US 2**, but Static Web Apps serve
+  content from a global CDN, so the registration region does not affect latency.
+
+### Request/response path
+1. User loads the SPA from the Static Web App (global CDN edge).
+2. The SPA calls `https://freelanceo-api-.../api/*` (URL baked in at build time).
+3. App Service (FastAPI) authenticates via JWT / session cookie, then reads/writes
+   Cosmos DB, streams media from Blob Storage, and calls Stripe / Google as needed.
+4. CORS is validated at the Azure platform layer first, then the app layer.
+
+---
+
+## System Architecture Overview (original dev environment)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -61,7 +139,7 @@
 │  │  • job_applications       • messages                      │ │
 │  │  • reviews                • notifications                 │ │
 │  │  • sessions               • payment_transactions          │ │
-│  │  • hiring_requests                                        │ │
+│  │  • hiring_requests        • contracts                     │ │
 │  └───────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
                 │

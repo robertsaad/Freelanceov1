@@ -5,34 +5,41 @@ A modern platform where freelancers can showcase their portfolios and clients ca
 ## 🚀 Features
 
 - **For Freelancers**
-  - Create detailed profiles with bio, skills, and hourly rates
-  - Upload portfolio items to showcase work
-  - Subscribe to be visible to clients (Stripe integration)
-  - Receive hiring requests from clients
+  - Multi-step onboarding wizard, then a detailed profile (bio, skills, hourly rate)
+  - Upload portfolio media (image/video/audio, up to 50 MB) via Azure Blob Storage
+  - Subscribe to be visible to clients (Stripe) — $19.99/mo or $149.99/yr, 0% commission
+  - Receive hiring requests and track engagements via **Contracts & Work Diary**
+  - Freelancer **Statistics** and **Account Health** dashboards
   - Post updates to followers
 
 - **For Clients**
   - Browse and search freelancers by category, skills, rating
   - View freelancer portfolios and reviews
-  - Send hiring requests
+  - Send hiring requests (accepted requests become contracts)
   - Message freelancers directly
   - Leave reviews and ratings
+
+- **Admin**
+  - Admin panel for users, freelancers, jobs, payments, and categories
 
 - **Mobile Features**
   - Bottom navigation bar (Feed, Talent, Messages, Alerts)
   - Follow freelancers and see their posts
-  - Real-time notifications
+  - Notifications
   - PWA / Capacitor ready for iOS/Android
 
 ## 🏗️ Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 19 + Tailwind CSS + Shadcn UI |
+| Frontend | React 19 + Tailwind CSS + Shadcn UI (CRACO) |
 | Backend | FastAPI (Python 3.11) |
-| Database | MongoDB |
-| Auth | JWT + Google OAuth (Emergent) |
+| Database | Azure Cosmos DB for MongoDB (serverless) |
+| Media | Azure Blob Storage |
+| Auth | JWT + Google OAuth |
 | Payments | Stripe |
+| Hosting | Azure App Service + Azure Static Web Apps |
+| CI/CD | GitHub Actions (push-to-deploy on `main`) |
 | Mobile | Capacitor (iOS/Android) |
 
 ## 📁 Project Structure
