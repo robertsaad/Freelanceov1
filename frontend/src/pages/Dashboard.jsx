@@ -8,6 +8,7 @@ import MobileNav from "@/components/MobileNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   User,
   MessageSquare,
@@ -17,7 +18,10 @@ import {
   TrendingUp,
   Eye,
   Clock,
-  AlertCircle
+  AlertCircle,
+  CreditCard,
+  CheckCircle2,
+  Circle
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -44,6 +48,28 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  // Profile completion checklist — drives the progress widget.
+  const getCompletion = (p) => {
+    if (!p) return { percent: 0, items: [] };
+    const items = [
+      { label: "Professional title", done: !!(p.title && p.title.trim()) },
+      { label: "Overview / bio", done: !!(p.bio && p.bio.trim().length >= 50) },
+      { label: "Skills", done: Array.isArray(p.skills) && p.skills.length > 0 },
+      { label: "Category", done: !!p.category },
+      { label: "Hourly rate", done: Number(p.hourly_rate) > 0 },
+      { label: "Work experience", done: Array.isArray(p.employment_history) && p.employment_history.length > 0 },
+      { label: "Education", done: Array.isArray(p.education) && p.education.length > 0 },
+      { label: "Languages", done: Array.isArray(p.languages) && p.languages.length > 0 },
+      { label: "Location", done: !!(p.location || p.city || p.country) },
+      { label: "Portfolio item", done: Array.isArray(p.portfolio_items) && p.portfolio_items.length > 0 },
+    ];
+    const doneCount = items.filter((i) => i.done).length;
+    const percent = Math.round((doneCount / items.length) * 100);
+    return { percent, items };
+  };
+
+  const completion = getCompletion(profile);
 
   if (loading) {
     return (
@@ -168,6 +194,41 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* Profile Completion */}
+            {profile && completion.percent < 100 && (
+              <Card className="mb-8" data-testid="profile-completion">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Complete your profile</h3>
+                      <p className="text-sm text-gray-500">
+                        A complete profile ranks higher and wins more clients.
+                      </p>
+                    </div>
+                    <span className="text-2xl font-bold text-cyan-600">{completion.percent}%</span>
+                  </div>
+                  <Progress value={completion.percent} className="h-2 mb-4" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {completion.items.map((item) => (
+                      <div key={item.label} className="flex items-center gap-2 text-sm">
+                        {item.done ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                        ) : (
+                          <Circle className="h-4 w-4 text-gray-300 shrink-0" />
+                        )}
+                        <span className={item.done ? "text-gray-500" : "text-gray-800"}>
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button variant="outline" className="mt-4" asChild>
+                    <Link to="/dashboard/profile">Finish your profile</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Quick Actions */}
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -208,6 +269,20 @@ export default function Dashboard() {
                     <div>
                       <h3 className="font-medium text-gray-900">Hiring Requests</h3>
                       <p className="text-sm text-gray-500">View project requests</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link to="/dashboard/billing" data-testid="billing-card">
+                <Card className="hover:border-cyan-200 cursor-pointer transition-colors h-full">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="h-12 w-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                      <CreditCard className="h-6 w-6 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Membership &amp; Billing</h3>
+                      <p className="text-sm text-gray-500">Plan, renewal &amp; payment history</p>
                     </div>
                   </CardContent>
                 </Card>

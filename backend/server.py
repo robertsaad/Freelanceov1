@@ -1104,6 +1104,50 @@ async def stripe_webhook(request: Request):
         logger.error(f"Webhook error: {e}")
         return JSONResponse(status_code=400, content={"error": str(e)})
 
+@api_router.get("/billing/me")
+async def get_my_billing(request: Request):
+    """Return the current freelancer's membership status, plan, and billing history.
+
+    Freelanceo charges only a monthly membership (registration) fee and never
+    takes a service fee, so there are no earnings/withdrawals here — just the
+    subscription and the history of membership payments.
+    """
+    user = await require_auth(request)
+
+    profile = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+
+    transactions = await db.payment_transactions.find(
+        {"user_id": user["id"]}, {"_id": 0, "metadata": 0}
+    ).to_list(200)
+    transactions.sort(key=lambda t: t.get("created_at") or "", reverse=True)
+
+    total_paid = round(
+        sum(t.get("amount", 0) for t in transactions if t.get("payment_status") == "paid"),
+        2,
+    )
+
+    subscription_status = profile.get("subscription_status") if profile else "inactive"
+    expires_at = profile.get("subscription_expires_at") if profile else None
+
+    # Infer current plan from the most recent paid transaction.
+    current_plan = None
+    for t in transactions:
+        if t.get("payment_status") == "paid" and t.get("package_type"):
+            plan = SUBSCRIPTION_PLANS.get(t["package_type"])
+            if plan:
+                current_plan = {"package_type": t["package_type"], **plan}
+            break
+
+    return {
+        "subscription_status": subscription_status or "inactive",
+        "subscription_expires_at": expires_at,
+        "current_plan": current_plan,
+        "total_paid": total_paid,
+        "takes_service_fee": False,
+        "plans": SUBSCRIPTION_PLANS,
+        "transactions": transactions,
+    }
+
 # ==================== FOLLOW SYSTEM ENDPOINTS ====================
 
 @api_router.post("/freelancers/{freelancer_id}/follow")
