@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Menu, X, User, LayoutDashboard, MessageSquare, FileText, LogOut, 
   ChevronDown, Briefcase, Search, Users, Code, Palette, PenTool, 
-  Video, TrendingUp, Database, Smartphone, Music, Building, ArrowRight, Shield, CreditCard, BarChart3, HeartPulse 
+  Video, TrendingUp, Database, Smartphone, Music, Building, ArrowRight, Shield, CreditCard, BarChart3, HeartPulse, FileSignature 
 } from "lucide-react";
 
 const categories = [
@@ -291,6 +291,12 @@ export default function Navbar() {
                     <Link to="/dashboard/requests" className="flex items-center gap-2" data-testid="requests-link">
                       <FileText className="h-4 w-4" />
                       Hiring Requests
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard/contracts" className="flex items-center gap-2" data-testid="contracts-link">
+                      <FileSignature className="h-4 w-4" />
+                      Contracts
                     </Link>
                   </DropdownMenuItem>
                   {user.role === "admin" && (

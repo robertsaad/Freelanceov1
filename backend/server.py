@@ -216,6 +216,14 @@ class HiringRequestCreate(BaseModel):
 class HiringRequestUpdate(BaseModel):
     status: str  # accepted, rejected, completed
 
+# Contract Models
+class ContractUpdate(BaseModel):
+    status: str  # active, completed, ended
+
+class DiaryEntryCreate(BaseModel):
+    note: str
+    entry_date: Optional[str] = None  # ISO date; defaults to today
+
 # Payment Models
 class CheckoutRequest(BaseModel):
     package_type: str  # monthly or yearly
@@ -1094,8 +1102,191 @@ async def update_hiring_request(request_id: str, data: HiringRequestUpdate, requ
         {"id": request_id},
         {"$set": {"status": data.status, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
+
+    # When accepted, spin up a contract (once) so both parties can track the engagement
+    if data.status == "accepted":
+        existing = await db.contracts.find_one({"hiring_request_id": request_id})
+        if not existing:
+            freelancer_profile = await db.freelancer_profiles.find_one({"id": hiring_req["freelancer_id"]})
+            now_iso = datetime.now(timezone.utc).isoformat()
+            contract = {
+                "id": str(uuid.uuid4()),
+                "hiring_request_id": request_id,
+                "client_id": hiring_req["client_id"],
+                "freelancer_id": hiring_req["freelancer_id"],
+                "freelancer_user_id": freelancer_profile["user_id"] if freelancer_profile else None,
+                "title": hiring_req["project_title"],
+                "description": hiring_req["project_description"],
+                "budget": hiring_req.get("budget"),
+                "status": "active",
+                "diary": [],
+                "started_at": now_iso,
+                "ended_at": None,
+                "created_at": now_iso,
+                "updated_at": now_iso,
+            }
+            await db.contracts.insert_one(contract)
+            # Notify the client that the contract is active
+            notification = {
+                "id": str(uuid.uuid4()),
+                "user_id": hiring_req["client_id"],
+                "type": "contract",
+                "title": "Contract started",
+                "message": f"{user['name']} accepted your request \u2014 the contract for '{hiring_req['project_title']}' is now active.",
+                "link": "/dashboard/contracts",
+                "is_read": False,
+                "created_at": now_iso,
+            }
+            await db.notifications.insert_one(notification)
+
+    # Keep the linked contract in sync when the request is completed
+    if data.status == "completed":
+        await db.contracts.update_one(
+            {"hiring_request_id": request_id, "status": {"$ne": "ended"}},
+            {"$set": {
+                "status": "completed",
+                "ended_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
     
     return {"message": "Request updated"}
+
+# ==================== CONTRACT ENDPOINTS ====================
+
+async def _enrich_contract(contract: dict, viewer_role: str):
+    """Attach client + freelancer summaries to a contract document."""
+    client = await db.users.find_one({"id": contract["client_id"]}, {"_id": 0, "password_hash": 0})
+    contract["client"] = client
+    freelancer = await db.freelancer_profiles.find_one({"id": contract["freelancer_id"]}, {"_id": 0})
+    if freelancer:
+        f_user = await db.users.find_one({"id": freelancer["user_id"]}, {"_id": 0, "password_hash": 0})
+        contract["freelancer"] = {**freelancer, "user": f_user}
+    return contract
+
+
+async def _get_contract_for_user(contract_id: str, user: dict):
+    """Fetch a contract and ensure the current user is a participant."""
+    contract = await db.contracts.find_one({"id": contract_id}, {"_id": 0})
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    is_client = contract["client_id"] == user["id"]
+    is_freelancer = contract.get("freelancer_user_id") == user["id"]
+    if not (is_client or is_freelancer):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return contract, is_client, is_freelancer
+
+
+@api_router.get("/contracts")
+async def get_contracts(request: Request, status: Optional[str] = None,
+                        search: Optional[str] = None, sort: str = "started_at",
+                        order: str = "desc"):
+    """List contracts for the current user (client or freelancer)."""
+    user = await require_auth(request)
+
+    if user["role"] == "client":
+        query = {"client_id": user["id"]}
+    else:
+        query = {"freelancer_user_id": user["id"]}
+
+    if status and status != "all":
+        query["status"] = status
+    if search:
+        query["title"] = {"$regex": search, "$options": "i"}
+
+    sort_field = sort if sort in ("started_at", "created_at", "title") else "started_at"
+    direction = 1 if order == "asc" else -1
+
+    contracts = await db.contracts.find(query, {"_id": 0}).sort(sort_field, direction).to_list(200)
+    for c in contracts:
+        await _enrich_contract(c, user["role"])
+    return contracts
+
+
+@api_router.get("/contracts/summary")
+async def get_contracts_summary(request: Request):
+    """Counts of contracts by status for the current user."""
+    user = await require_auth(request)
+    base = {"client_id": user["id"]} if user["role"] == "client" else {"freelancer_user_id": user["id"]}
+    active = await db.contracts.count_documents({**base, "status": "active"})
+    completed = await db.contracts.count_documents({**base, "status": "completed"})
+    ended = await db.contracts.count_documents({**base, "status": "ended"})
+    total = await db.contracts.count_documents(base)
+    return {"active": active, "completed": completed, "ended": ended, "total": total}
+
+
+@api_router.get("/contracts/{contract_id}")
+async def get_contract(contract_id: str, request: Request):
+    """Get a single contract with diary entries."""
+    user = await require_auth(request)
+    contract, _, _ = await _get_contract_for_user(contract_id, user)
+    await _enrich_contract(contract, user["role"])
+    contract.setdefault("diary", [])
+    contract["diary"].sort(key=lambda e: e.get("entry_date", ""), reverse=True)
+    return contract
+
+
+@api_router.put("/contracts/{contract_id}")
+async def update_contract(contract_id: str, data: ContractUpdate, request: Request):
+    """Update a contract's status (active -> completed/ended)."""
+    user = await require_auth(request)
+    contract, _, _ = await _get_contract_for_user(contract_id, user)
+
+    if data.status not in ("active", "completed", "ended"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    update = {"status": data.status, "updated_at": datetime.now(timezone.utc).isoformat()}
+    if data.status in ("completed", "ended"):
+        update["ended_at"] = datetime.now(timezone.utc).isoformat()
+    else:
+        update["ended_at"] = None
+
+    await db.contracts.update_one({"id": contract_id}, {"$set": update})
+    return {"message": "Contract updated"}
+
+
+@api_router.post("/contracts/{contract_id}/diary")
+async def add_diary_entry(contract_id: str, data: DiaryEntryCreate, request: Request):
+    """Add a dated activity-log entry to a contract."""
+    user = await require_auth(request)
+    contract, _, _ = await _get_contract_for_user(contract_id, user)
+
+    note = data.note.strip()
+    if not note:
+        raise HTTPException(status_code=400, detail="Note cannot be empty")
+
+    entry = {
+        "id": str(uuid.uuid4()),
+        "author_id": user["id"],
+        "author_name": user["name"],
+        "note": note,
+        "entry_date": data.entry_date or datetime.now(timezone.utc).date().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.contracts.update_one(
+        {"id": contract_id},
+        {"$push": {"diary": entry}, "$set": {"updated_at": entry["created_at"]}}
+    )
+    return entry
+
+
+@api_router.delete("/contracts/{contract_id}/diary/{entry_id}")
+async def delete_diary_entry(contract_id: str, entry_id: str, request: Request):
+    """Delete a diary entry (author only)."""
+    user = await require_auth(request)
+    contract, _, _ = await _get_contract_for_user(contract_id, user)
+
+    entry = next((e for e in contract.get("diary", []) if e.get("id") == entry_id), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if entry.get("author_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="You can only delete your own entries")
+
+    await db.contracts.update_one(
+        {"id": contract_id},
+        {"$pull": {"diary": {"id": entry_id}}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"message": "Entry deleted"}
 
 # ==================== PAYMENT ENDPOINTS ====================
 

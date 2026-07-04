@@ -23,7 +23,8 @@ import {
   CheckCircle2,
   Circle,
   BarChart3,
-  HeartPulse
+  HeartPulse,
+  FileSignature
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -276,6 +277,20 @@ export default function Dashboard() {
                 </Card>
               </Link>
 
+              <Link to="/dashboard/contracts" data-testid="contracts-card">
+                <Card className="hover:border-cyan-200 cursor-pointer transition-colors h-full">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <FileSignature className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Contracts</h3>
+                      <p className="text-sm text-gray-500">Active &amp; past engagements</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
               <Link to="/dashboard/billing" data-testid="billing-card">
                 <Card className="hover:border-cyan-200 cursor-pointer transition-colors h-full">
                   <CardContent className="p-6 flex items-center gap-4">
@@ -362,6 +377,20 @@ export default function Dashboard() {
                     <div>
                       <h3 className="font-medium text-gray-900">My Requests</h3>
                       <p className="text-sm text-gray-500">Track your hiring requests</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link to="/dashboard/contracts" data-testid="contracts-card">
+                <Card className="hover:border-cyan-200 cursor-pointer transition-colors h-full">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <FileSignature className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Contracts</h3>
+                      <p className="text-sm text-gray-500">Engagements with freelancers</p>
                     </div>
                   </CardContent>
                 </Card>
