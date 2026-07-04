@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { useAuth, API } from "@/App";
+import { useAuth, API, BACKEND_URL } from "@/App";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MobileNav from "@/components/MobileNav";
@@ -407,13 +407,31 @@ export default function FreelancerProfile() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {freelancer.portfolio_items.map((item) => (
                   <div key={item.id} className="border rounded-lg p-4 hover:border-cyan-200 transition-colors">
-                    {item.image_url && (
+                    {item.media_type === "image" && item.media_url ? (
+                      <img
+                        src={item.media_url.startsWith("http") ? item.media_url : `${BACKEND_URL}${item.media_url}`}
+                        alt={item.title}
+                        className="w-full h-40 object-cover rounded-lg mb-3"
+                      />
+                    ) : item.media_type === "video" && item.media_url ? (
+                      <video
+                        src={item.media_url.startsWith("http") ? item.media_url : `${BACKEND_URL}${item.media_url}`}
+                        controls
+                        className="w-full h-40 object-cover rounded-lg mb-3 bg-black"
+                      />
+                    ) : item.media_type === "audio" && item.media_url ? (
+                      <audio
+                        src={item.media_url.startsWith("http") ? item.media_url : `${BACKEND_URL}${item.media_url}`}
+                        controls
+                        className="w-full mb-3"
+                      />
+                    ) : item.image_url ? (
                       <img
                         src={item.image_url}
                         alt={item.title}
                         className="w-full h-40 object-cover rounded-lg mb-3"
                       />
-                    )}
+                    ) : null}
                     <h4 className="font-semibold text-gray-900">{item.title}</h4>
                     <p className="text-gray-600 text-sm mt-1 line-clamp-2">{item.description}</p>
                     {item.link && (

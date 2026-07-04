@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { useAuth, API } from "@/App";
+import { useAuth, API, BACKEND_URL } from "@/App";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Plus, X, Save, Trash2, ExternalLink } from "lucide-react";
+import { Plus, X, Save, Trash2, ExternalLink, Upload, Loader2, Image as ImageIcon, Video, Music } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
+
+const mediaSrc = (url) => {
+  if (!url) return url;
+  return url.startsWith("http") ? url : `${BACKEND_URL}${url}`;
+};
 
 export default function EditProfile() {
   const { user } = useAuth();
@@ -37,11 +42,14 @@ export default function EditProfile() {
 
   const [newSkill, setNewSkill] = useState("");
   const [portfolioItems, setPortfolioItems] = useState([]);
+  const [uploading, setUploading] = useState(false);
   const [newPortfolio, setNewPortfolio] = useState({
     title: "",
     description: "",
     image_url: "",
-    link: ""
+    link: "",
+    media_type: "",
+    media_url: "",
   });
 
   useEffect(() => {
@@ -122,10 +130,39 @@ export default function EditProfile() {
         { withCredentials: true }
       );
       setPortfolioItems([...portfolioItems, response.data]);
-      setNewPortfolio({ title: "", description: "", image_url: "", link: "" });
+      setNewPortfolio({ title: "", description: "", image_url: "", link: "", media_type: "", media_url: "" });
       toast.success("Portfolio item added!");
     } catch (error) {
       toast.error("Failed to add portfolio item");
+    }
+  };
+
+  const handleMediaUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting same file
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File too large. Maximum size is 50 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await axios.post(`${API}/uploads`, fd, {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setNewPortfolio((prev) => ({
+        ...prev,
+        media_type: res.data.media_type,
+        media_url: res.data.media_url,
+      }));
+      toast.success("File uploaded! Add a title and save.");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Upload failed");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -321,9 +358,15 @@ export default function EditProfile() {
                       >
                         <Trash2 className="h-4 w-4 text-red-600" />
                       </button>
-                      {item.image_url && (
-                        <img src={item.image_url} alt={item.title} className="w-full h-32 object-cover rounded mb-2" />
-                      )}
+                      {item.media_type === "image" && item.media_url ? (
+                        <img src={mediaSrc(item.media_url)} alt={item.title} className="w-full h-40 object-cover rounded mb-2" />
+                      ) : item.media_type === "video" && item.media_url ? (
+                        <video src={mediaSrc(item.media_url)} controls className="w-full h-40 object-cover rounded mb-2 bg-black" />
+                      ) : item.media_type === "audio" && item.media_url ? (
+                        <audio src={mediaSrc(item.media_url)} controls className="w-full mb-2" />
+                      ) : item.image_url ? (
+                        <img src={item.image_url} alt={item.title} className="w-full h-40 object-cover rounded mb-2" />
+                      ) : null}
                       <h4 className="font-medium">{item.title}</h4>
                       <p className="text-sm text-gray-600 line-clamp-2">{item.description}</p>
                       {item.link && (
@@ -368,6 +411,55 @@ export default function EditProfile() {
                       onChange={(e) => setNewPortfolio({...newPortfolio, image_url: e.target.value})}
                       data-testid="portfolio-image-input"
                     />
+                  </div>
+                  <div>
+                    <Label>Upload media (image, video, or music)</Label>
+                    <p className="text-xs text-gray-500 mb-2">Max 50 MB. JPG, PNG, GIF, WEBP, MP4, WEBM, MOV, MP3, WAV, OGG.</p>
+                    {newPortfolio.media_url ? (
+                      <div className="border rounded-lg p-3 bg-gray-50">
+                        {newPortfolio.media_type === "image" && (
+                          <img src={mediaSrc(newPortfolio.media_url)} alt="preview" className="w-full h-40 object-cover rounded" />
+                        )}
+                        {newPortfolio.media_type === "video" && (
+                          <video src={mediaSrc(newPortfolio.media_url)} controls className="w-full h-40 object-cover rounded bg-black" />
+                        )}
+                        {newPortfolio.media_type === "audio" && (
+                          <audio src={mediaSrc(newPortfolio.media_url)} controls className="w-full" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setNewPortfolio({ ...newPortfolio, media_type: "", media_url: "" })}
+                          className="text-red-600 text-sm flex items-center gap-1 mt-2"
+                        >
+                          <X className="h-3 w-3" /> Remove uploaded file
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer hover:bg-gray-50 transition">
+                        {uploading ? (
+                          <Loader2 className="h-6 w-6 text-gray-400 animate-spin" />
+                        ) : (
+                          <>
+                            <div className="flex gap-3 text-gray-400 mb-2">
+                              <ImageIcon className="h-5 w-5" />
+                              <Video className="h-5 w-5" />
+                              <Music className="h-5 w-5" />
+                            </div>
+                            <span className="text-sm text-gray-600 flex items-center gap-1">
+                              <Upload className="h-4 w-4" /> Click to upload a file
+                            </span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*,video/*,audio/*"
+                          className="hidden"
+                          onChange={handleMediaUpload}
+                          disabled={uploading}
+                          data-testid="portfolio-upload-input"
+                        />
+                      </label>
+                    )}
                   </div>
                   <div>
                     <Label>Description</Label>

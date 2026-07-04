@@ -21,7 +21,9 @@ import {
   AlertCircle,
   CreditCard,
   CheckCircle2,
-  Circle
+  Circle,
+  BarChart3,
+  HeartPulse
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -283,6 +285,34 @@ export default function Dashboard() {
                     <div>
                       <h3 className="font-medium text-gray-900">Membership &amp; Billing</h3>
                       <p className="text-sm text-gray-500">Plan, renewal &amp; payment history</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link to="/dashboard/stats" data-testid="stats-card">
+                <Card className="hover:border-cyan-200 cursor-pointer transition-colors h-full">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="h-12 w-12 bg-cyan-100 rounded-full flex items-center justify-center">
+                      <BarChart3 className="h-6 w-6 text-cyan-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">My Stats</h3>
+                      <p className="text-sm text-gray-500">Views, followers &amp; opportunities</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link to="/dashboard/account-health" data-testid="account-health-card">
+                <Card className="hover:border-cyan-200 cursor-pointer transition-colors h-full">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="h-12 w-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <HeartPulse className="h-6 w-6 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Account Health</h3>
+                      <p className="text-sm text-gray-500">Standing &amp; platform access</p>
                     </div>
                   </CardContent>
                 </Card>

@@ -21,6 +21,10 @@ email-validator==2.2.0
 motor==3.3.1
 pymongo==4.6.3
 
+# --- Azure Blob Storage (portfolio media uploads) ---
+azure-storage-blob==12.23.1
+azure-identity==1.19.0
+
 # --- Utilities ---
 requests==2.32.3
 httpx>=0.28.1,<1.0.0

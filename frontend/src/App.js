@@ -15,6 +15,8 @@ import Dashboard from "@/pages/Dashboard";
 import EditProfile from "@/pages/EditProfile";
 import FreelancerOnboarding from "@/pages/FreelancerOnboarding";
 import Billing from "@/pages/Billing";
+import Statistics from "@/pages/Statistics";
+import AccountHealth from "@/pages/AccountHealth";
 import Messages from "@/pages/Messages";
 import HiringRequests from "@/pages/HiringRequests";
 import Pricing from "@/pages/Pricing";
@@ -230,6 +232,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute roles={["freelancer"]}>
             <Billing />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/stats"
+        element={
+          <ProtectedRoute roles={["freelancer"]}>
+            <Statistics />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/account-health"
+        element={
+          <ProtectedRoute roles={["freelancer"]}>
+            <AccountHealth />
           </ProtectedRoute>
         }
       />

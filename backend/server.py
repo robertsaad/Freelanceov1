@@ -1,5 +1,5 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File
+from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -37,6 +37,32 @@ JWT_EXPIRATION_DAYS = 7
 
 # Stripe Config
 STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', 'sk_test_emergent')
+
+# Azure Blob Storage Config (portfolio media uploads)
+AZURE_STORAGE_ACCOUNT = os.environ.get('AZURE_STORAGE_ACCOUNT')
+AZURE_STORAGE_CONTAINER = os.environ.get('AZURE_STORAGE_CONTAINER', 'portfolio')
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+ALLOWED_MEDIA_TYPES = {
+    "image": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+    "video": ["video/mp4", "video/webm", "video/quicktime"],
+    "audio": ["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/ogg"],
+}
+
+_blob_service_client = None
+
+def _get_blob_service():
+    """Lazily create a BlobServiceClient authenticated via managed identity."""
+    global _blob_service_client
+    if _blob_service_client is None:
+        if not AZURE_STORAGE_ACCOUNT:
+            raise HTTPException(status_code=503, detail="File uploads are not configured")
+        from azure.identity.aio import DefaultAzureCredential
+        from azure.storage.blob.aio import BlobServiceClient
+        _blob_service_client = BlobServiceClient(
+            account_url=f"https://{AZURE_STORAGE_ACCOUNT}.blob.core.windows.net",
+            credential=DefaultAzureCredential(),
+        )
+    return _blob_service_client
 
 # Subscription Plans (Server-side defined - NEVER accept from frontend)
 SUBSCRIPTION_PLANS = {
@@ -167,6 +193,8 @@ class AddPortfolioItem(BaseModel):
     description: str
     image_url: Optional[str] = None
     link: Optional[str] = None
+    media_type: Optional[str] = None  # image | video | audio | link
+    media_url: Optional[str] = None
 
 # Review Models
 class ReviewCreate(BaseModel):
@@ -552,17 +580,53 @@ async def get_categories():
     return [{"name": r["_id"], "count": r["count"]} for r in results if r["_id"]]
 
 @api_router.get("/freelancers/{freelancer_id}")
-async def get_freelancer(freelancer_id: str):
+async def get_freelancer(freelancer_id: str, request: Request):
     """Get single freelancer profile"""
     freelancer = await db.freelancer_profiles.find_one({"id": freelancer_id}, {"_id": 0})
     if not freelancer:
         raise HTTPException(status_code=404, detail="Freelancer not found")
-    
+
+    # Best-effort profile view tracking (skip the owner viewing their own profile)
+    try:
+        viewer = await get_current_user(request)
+        if not viewer or viewer.get("id") != freelancer.get("user_id"):
+            await db.freelancer_profiles.update_one(
+                {"id": freelancer_id}, {"$inc": {"profile_views": 1}}
+            )
+            freelancer["profile_views"] = freelancer.get("profile_views", 0) + 1
+    except Exception:
+        pass
+
     user = await db.users.find_one({"id": freelancer["user_id"]}, {"_id": 0, "password_hash": 0})
     if user:
         freelancer["user"] = user
-    
+
     return freelancer
+
+@api_router.get("/freelancers/stats/me")
+async def get_my_stats(request: Request):
+    """Aggregated statistics for the current freelancer."""
+    user = await require_auth(request)
+    profile = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    followers = await db.follows.count_documents({"freelancer_id": profile["id"]})
+    hiring_requests = await db.hiring_requests.count_documents({"freelancer_id": profile["id"]})
+    applications = await db.job_applications.count_documents({"freelancer_id": user["id"]})
+
+    return {
+        "profile_views": profile.get("profile_views", 0),
+        "followers": followers,
+        "total_reviews": profile.get("total_reviews", 0),
+        "average_rating": profile.get("average_rating", 0),
+        "hiring_requests_received": hiring_requests,
+        "applications_sent": applications,
+        "portfolio_count": len(profile.get("portfolio_items", [])),
+        "is_available": profile.get("is_available", True),
+        "subscription_status": profile.get("subscription_status", "inactive"),
+        "member_since": profile.get("created_at"),
+    }
 
 @api_router.get("/freelancers/profile/me")
 async def get_my_profile(request: Request):
@@ -655,7 +719,9 @@ async def add_portfolio_item(data: AddPortfolioItem, request: Request):
         "title": data.title,
         "description": data.description,
         "image_url": data.image_url,
-        "link": data.link
+        "link": data.link,
+        "media_type": data.media_type,
+        "media_url": data.media_url,
     }
     
     await db.freelancer_profiles.update_one(
@@ -676,6 +742,91 @@ async def remove_portfolio_item(item_id: str, request: Request):
     )
     
     return {"message": "Item removed"}
+
+# ==================== MEDIA UPLOAD ENDPOINTS ====================
+
+@api_router.post("/uploads")
+async def upload_media(request: Request, file: UploadFile = File(...)):
+    """Upload a portfolio media file (image/video/audio) to Azure Blob Storage."""
+    user = await require_auth(request)
+
+    content_type = (file.content_type or "").lower()
+    media_type = None
+    for mt, allowed in ALLOWED_MEDIA_TYPES.items():
+        if content_type in allowed:
+            media_type = mt
+            break
+    if not media_type:
+        raise HTTPException(status_code=400, detail="Unsupported file type. Upload an image, video, or audio file.")
+
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 50 MB.")
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    blob_name = f"{user['id']}/{uuid.uuid4().hex}{ext}"
+
+    from azure.storage.blob import ContentSettings
+    service = _get_blob_service()
+    container = service.get_container_client(AZURE_STORAGE_CONTAINER)
+    try:
+        await container.create_container()
+    except Exception:
+        pass  # container already exists
+    await container.upload_blob(
+        name=blob_name,
+        data=data,
+        overwrite=True,
+        content_settings=ContentSettings(content_type=content_type),
+    )
+
+    return {
+        "media_type": media_type,
+        "media_url": f"/api/uploads/file/{blob_name}",
+        "content_type": content_type,
+        "filename": file.filename,
+    }
+
+@api_router.get("/uploads/file/{blob_name:path}")
+async def serve_media(blob_name: str):
+    """Stream a stored media file through the backend using managed identity."""
+    service = _get_blob_service()
+    container = service.get_container_client(AZURE_STORAGE_CONTAINER)
+    blob = container.get_blob_client(blob_name)
+    try:
+        props = await blob.get_blob_properties()
+    except Exception:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    downloader = await blob.download_blob()
+
+    async def _stream():
+        async for chunk in downloader.chunks():
+            yield chunk
+
+    return StreamingResponse(
+        _stream(),
+        media_type=(props.content_settings.content_type if props.content_settings else None) or "application/octet-stream",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+@api_router.get("/account-health/me")
+async def get_account_health(request: Request):
+    """Account health & standing for the current freelancer."""
+    user = await require_auth(request)
+    profile = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+    suspended = bool(profile.get("is_suspended")) if profile else False
+    return {
+        "platform_access": "suspended" if suspended else "full",
+        "account_standing": "at_risk" if suspended else "good",
+        "policy_violations": 0,
+        "submitted_appeals": 0,
+        "is_suspended": suspended,
+        "subscription_status": profile.get("subscription_status", "inactive") if profile else "inactive",
+        "member_since": profile.get("created_at") if profile else None,
+    }
 
 # ==================== REVIEWS ENDPOINTS ====================
 
