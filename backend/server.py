@@ -2414,7 +2414,11 @@ async def admin_seed_demo(data: SeedRequest):
         raise HTTPException(status_code=404, detail="Not found")
     if data.secret != configured:
         raise HTTPException(status_code=403, detail="Invalid secret")
+    return await _seed_demo_data()
 
+
+async def _seed_demo_data() -> dict:
+    """Idempotently populate demo freelancers, clients, jobs and reviews."""
     now = datetime.now(timezone.utc).isoformat()
     pw = hash_password("Demo1234!")
 
@@ -3181,6 +3185,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def _local_auto_seed():
+    """When running locally against the in-memory mock DB (or AUTO_SEED=1), populate
+    demo data and a local admin so the app isn't empty. Never runs against real Cosmos."""
+    auto = os.environ.get("AUTO_SEED", "").lower() in ("1", "true", "yes")
+    if not (_use_mock_db or auto):
+        return
+    try:
+        if await db.users.count_documents({}) > 0:
+            return
+        await _seed_demo_data()
+        nowt = datetime.now(timezone.utc).isoformat()
+        await db.users.insert_one({
+            "id": str(uuid.uuid4()), "email": "freelanceo@freelanceo.com",
+            "name": "Local Admin", "picture": None, "role": "admin",
+            "password_hash": hash_password("rorotest"), "auth_provider": "email",
+            "is_active": True, "created_at": nowt, "updated_at": nowt,
+        })
+        logger.info("Local auto-seed complete: demo data + admin freelanceo@freelanceo.com / rorotest")
+    except Exception:
+        logger.exception("Local auto-seed failed")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

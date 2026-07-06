@@ -6,6 +6,35 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Local dev loop (mock DB + auto-seed), no Azure needed
+
+**Summary:** You can now run and fully test the app locally without touching Azure
+Cosmos (which is private-endpoint only). Backend runs against an in-memory mock DB that
+auto-seeds demo data + a local admin on startup, so you only push to Azure when a
+change actually needs Azure-only pieces.
+
+**Added**
+- `backend/requirements-dev.txt` — lean local deps incl. `mongomock-motor` (heavy
+  cloud/ML deps excluded; they're lazily imported and Azure-only).
+- `backend/server.py` — startup hook `_local_auto_seed()`: when `USE_MOCK_DB=true`
+  (or `AUTO_SEED=1`) and the DB is empty, seeds demo data via the extracted
+  `_seed_demo_data()` helper and creates a local admin (`freelanceo@freelanceo.com` /
+  `rorotest`). No-op on Azure (neither flag is set there).
+- `frontend/.env.development` (gitignored) — points `yarn start` at `localhost:8001`.
+
+**How to run locally**
+```
+cd backend; pip install -r requirements-dev.txt; python -m uvicorn server:app --port 8001
+cd frontend; yarn start
+```
+`backend/.env` already has `USE_MOCK_DB="true"`. Log in with the demo accounts
+(`*.@freelanceo-demo.com` / `Demo1234!`) or the admin above.
+
+**Caveat** the mock DB does not replicate Cosmos quirks (e.g. the `.sort()` limitation)
+and Azure-only features (Foundry CV parsing, Blob uploads) won't work locally.
+
+---
+
 ## 2026-07-06 — Admin: separate Admins / Clients / Freelancers tabs
 
 **Summary:** Restructured the Admin dashboard so identities are grouped the way they'll

@@ -1,0 +1,21 @@
+# Local development only — NOT installed on Azure.
+# Lean set: just what's needed to run server.py locally against the in-memory
+# mock DB (USE_MOCK_DB=true). Heavy/cloud deps (openai, litellm, google-*, boto3,
+# azure-*) are intentionally excluded — they're lazily imported and only power the
+# Foundry CV parser / Blob uploads, which require Azure and won't run locally.
+#
+# Install with:  pip install -r requirements-dev.txt
+
+fastapi==0.110.1
+uvicorn==0.25.0
+pydantic>=2.10
+python-dotenv==1.0.1
+python-multipart==0.0.9
+passlib==1.7.4
+bcrypt>=4.2.0
+PyJWT==2.10.1
+email-validator==2.2.0
+motor==3.3.1
+pymongo==4.6.3
+httpx>=0.28.1,<1.0.0
+mongomock-motor>=0.0.29
