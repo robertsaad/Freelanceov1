@@ -1,14 +1,66 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star, MapPin, Clock } from "lucide-react";
+import { Star, MapPin, Clock, Lock } from "lucide-react";
 
-export default function FreelancerCard({ freelancer }) {
+export default function FreelancerCard({ freelancer, locked = false }) {
   const getInitials = (name) => {
     if (!name) return "F";
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   };
+
+  // Locked teaser for logged-out visitors: only the professional title and
+  // review score are shown; everything else is greyed out until they sign up.
+  if (locked) {
+    return (
+      <Card className="relative h-full overflow-hidden" data-testid={`freelancer-card-locked-${freelancer.id}`}>
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="font-semibold text-gray-900 text-base leading-snug pr-2">
+              {freelancer.title || "Freelancer"}
+            </h3>
+            <div className="flex items-center gap-1 shrink-0">
+              <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+              <span className="font-semibold text-gray-900">
+                {freelancer.average_rating?.toFixed(1) || "New"}
+              </span>
+              <span className="text-gray-500 text-sm">({freelancer.total_reviews || 0})</span>
+            </div>
+          </div>
+
+          <div className="mt-4 blur-[5px] select-none pointer-events-none opacity-70" aria-hidden="true">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-gray-200" />
+              <div className="space-y-2">
+                <div className="h-3 w-32 bg-gray-200 rounded" />
+                <div className="h-3 w-24 bg-gray-100 rounded" />
+              </div>
+            </div>
+            <div className="h-3 w-full bg-gray-100 rounded mt-4" />
+            <div className="h-3 w-2/3 bg-gray-100 rounded mt-2" />
+            <div className="flex gap-2 mt-4">
+              <div className="h-6 w-16 bg-gray-100 rounded-full" />
+              <div className="h-6 w-16 bg-gray-100 rounded-full" />
+              <div className="h-6 w-16 bg-gray-100 rounded-full" />
+            </div>
+          </div>
+        </CardContent>
+
+        <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-white via-white/70 to-transparent">
+          <div className="mb-5 text-center px-4">
+            <div className="inline-flex items-center gap-1.5 text-gray-600 text-sm mb-2">
+              <Lock className="h-4 w-4" /> Sign up to view this profile
+            </div>
+            <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700" asChild>
+              <Link to="/register" data-testid="freelancer-unlock-btn">Sign up to unlock</Link>
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Link to={`/freelancers/${freelancer.id}`} data-testid={`freelancer-card-${freelancer.id}`}>

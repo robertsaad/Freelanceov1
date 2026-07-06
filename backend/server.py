@@ -518,6 +518,7 @@ async def logout(request: Request, response: Response):
 
 @api_router.get("/freelancers")
 async def list_freelancers(
+    request: Request,
     category: Optional[str] = None,
     skills: Optional[str] = None,
     min_rating: Optional[float] = None,
@@ -568,6 +569,23 @@ async def list_freelancers(
         user = await db.users.find_one({"id": f["user_id"]}, {"_id": 0, "password_hash": 0})
         if user:
             f["user"] = user
+    
+    # Gate for logged-out visitors: only expose the professional title + review
+    # score (no name/bio/skills/rate/contact) until they sign up.
+    viewer = await get_current_user(request)
+    if not viewer:
+        freelancers = [
+            {
+                "id": f.get("id"),
+                "title": f.get("title"),
+                "category": f.get("category"),
+                "average_rating": f.get("average_rating", 0),
+                "total_reviews": f.get("total_reviews", 0),
+                "is_featured": f.get("is_featured", False),
+                "preview_only": True,
+            }
+            for f in freelancers
+        ]
     
     return {
         "freelancers": freelancers,
@@ -1258,7 +1276,8 @@ async def send_message(data: MessageCreate, request: Request):
     }
     await db.notifications.insert_one(notification)
     
-    return {"_id": 0, **message}
+    message.pop("_id", None)
+    return message
 
 # ==================== HIRING REQUESTS ENDPOINTS ====================
 

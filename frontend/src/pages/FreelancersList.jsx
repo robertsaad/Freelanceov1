@@ -9,10 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { API } from "@/App";
-import { Search, Filter, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { useAuth } from "@/App";
+import { Search, Filter, Users, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
 
 export default function FreelancersList() {
+  const { user } = useAuth();
+  const locked = !user;
   const [searchParams, setSearchParams] = useSearchParams();
   const categories = ["All Categories", ...useCategories()];
   const [freelancers, setFreelancers] = useState([]);
@@ -44,7 +47,7 @@ export default function FreelancersList() {
       params.append("page", page.toString());
       params.append("limit", "12");
 
-      const response = await axios.get(`${API}/freelancers?${params.toString()}`);
+      const response = await axios.get(`${API}/freelancers?${params.toString()}`, { withCredentials: true });
       setFreelancers(response.data.freelancers);
       setTotalPages(response.data.pages);
       setTotal(response.data.total);
@@ -103,6 +106,15 @@ export default function FreelancersList() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <h1 className="text-3xl font-bold text-gray-900">Find Freelancers</h1>
           <p className="mt-2 text-gray-600">Browse our network of talented professionals</p>
+
+          {locked && (
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-cyan-200 bg-cyan-50 px-4 py-3">
+              <Lock className="h-4 w-4 text-cyan-600 shrink-0" />
+              <p className="text-sm text-cyan-800">
+                You're viewing a limited preview. <Link to="/register" className="font-semibold underline">Sign up</Link> to see full profiles, names and contact talent.
+              </p>
+            </div>
+          )}
 
           {/* Filters */}
           <div className="mt-6 flex flex-col sm:flex-row gap-4">
@@ -167,7 +179,7 @@ export default function FreelancersList() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="freelancers-grid">
               {freelancers.map((freelancer) => (
-                <FreelancerCard key={freelancer.id} freelancer={freelancer} />
+                <FreelancerCard key={freelancer.id} freelancer={freelancer} locked={locked} />
               ))}
             </div>
 

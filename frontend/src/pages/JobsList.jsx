@@ -133,19 +133,23 @@ export default function JobsList() {
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0" data-testid="jobs-list-page">
       <Navbar />
 
-      {/* Subscription Banner for non-subscribed freelancers */}
-      {requiresSubscription && user?.role === "freelancer" && (
+      {/* Preview banner for guests and non-subscribed freelancers */}
+      {requiresSubscription && user?.role !== "client" && (
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Lock className="h-6 w-6" />
               <div>
-                <p className="font-semibold">Unlock Full Job Details</p>
-                <p className="text-sm text-indigo-100">Subscribe to view complete job descriptions, budgets, and client information</p>
+                <p className="font-semibold">{user ? "Unlock Full Job Details" : "Sign up to unlock full job details"}</p>
+                <p className="text-sm text-indigo-100">
+                  {user
+                    ? "Subscribe to view complete job descriptions, budgets, and client information"
+                    : "You're viewing job titles only. Sign up to see descriptions, budgets and client info."}
+                </p>
               </div>
             </div>
             <Button variant="secondary" asChild>
-              <Link to="/pricing">View Plans</Link>
+              <Link to={user ? "/pricing" : "/register"}>{user ? "View Plans" : "Sign up"}</Link>
             </Button>
           </div>
         </div>

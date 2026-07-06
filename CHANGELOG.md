@@ -6,6 +6,31 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Guest-gated browse preview + messaging 500 fix
+
+**Summary:** Logged-out visitors browsing the marketplace now see a limited preview
+(freelancer title + review score, or job title only) with everything else greyed out
+behind a sign-up CTA. Also fixed a bug that made sending a message return HTTP 500.
+
+**Fixed**
+- `backend/server.py` — `POST /api/messages` returned 500 (`ObjectId not iterable`).
+  `insert_one` mutates the dict with a Mongo `_id`, and the old
+  `return {"_id": 0, **message}` let that ObjectId override the 0, which FastAPI could
+  not serialize. Now pops `_id` and returns the clean message.
+
+**Added**
+- `frontend/src/pages/JobsList.jsx` — preview banner now also shown to guests
+  ("Sign up to unlock full job details" → /register), not just non-subscribed freelancers.
+- (Earlier this session) guest redaction on `GET /api/freelancers` and `/api/jobs`,
+  locked teaser cards in `FreelancerCard.jsx` / `JobCard.jsx`, guest banner on
+  `FreelancersList.jsx`.
+
+**Tested (local, mock DB)** Full two-user messaging flow verified end-to-end: send,
+receive, reply, conversation lists, unread counts, read-status, and `new_message`
+notifications for both parties. Guest browse shows title + rating only.
+
+---
+
 ## 2026-07-06 — Freelancer search by name + country filter
 
 **Summary:** Searching the talent marketplace by a freelancer's name now works, and a

@@ -72,7 +72,7 @@ export default function JobCard({ job }) {
               ) : (
                 <div className="flex items-center gap-2 text-gray-400">
                   <Lock className="h-4 w-4" />
-                  <p className="text-sm">Subscribe to view client</p>
+                  <p className="text-sm">Sign up to view client</p>
                 </div>
               )}
             </div>
@@ -97,12 +97,12 @@ export default function JobCard({ job }) {
           {isPreviewOnly && (
             <p className="text-gray-400 text-sm mb-4 italic flex items-center gap-2">
               <Lock className="h-4 w-4" />
-              Subscribe to view full job description
+              Sign up to view the full job details
             </p>
           )}
 
           {/* Skills */}
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className={`flex flex-wrap gap-2 mb-4 ${isPreviewOnly ? "blur-[4px] opacity-70 pointer-events-none select-none" : ""}`}>
             {job.skills_required?.slice(0, 3).map((skill, idx) => (
               <Badge key={idx} variant="secondary" className="bg-indigo-50 text-indigo-700 text-xs">
                 {skill}
@@ -116,7 +116,7 @@ export default function JobCard({ job }) {
           </div>
 
           {/* Footer with budget and details */}
-          <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+          <div className={`flex items-center justify-between pt-4 border-t border-gray-100 ${isPreviewOnly ? "blur-[4px] opacity-70 pointer-events-none select-none" : ""}`}>
             <div className="flex items-center gap-1 text-gray-600">
               <DollarSign className="h-4 w-4 text-green-600" />
               <span className="font-semibold text-gray-900">{formatBudget()}</span>
