@@ -6,6 +6,48 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Fix admin page (and other lists) failing to load
+
+**Summary:** The Admin page showed "failed to load users" and no data, because the
+admin list endpoints (and several others) used server-side Cosmos `.sort()`, which
+500s on this account once a collection has data. Converted every `.find().sort()` to
+sort in Python.
+
+**Fixed** (`backend/server.py`) — sort in Python instead of Cosmos `.sort()` for:
+`/admin/users`, `/admin/freelancers`, `/admin/jobs`, `/admin/payments`, plus
+`/messages/{id}`, `/hiring-requests`, `/contracts`, `/posts`, `/feed`,
+`/notifications`, and `/jobs/applications/my`. Pagination is now done in Python too.
+
+**Verified (live)** all four admin list endpoints return 200; the admin dashboard
+loads 37 users.
+
+---
+
+## 2026-07-06 — Fuller Edit Profile, admin subscription control, admin account
+
+**Summary:** Edit Profile now exposes personal details (name, phone, DOB, country and
+country-aware address) plus specialties; admins can grant/revoke a freelancer's
+subscription from the Admin page; and added a gated helper to set up an admin account.
+
+**Added**
+- `backend/server.py`
+  - `PUT /api/auth/me` — update the signed-in user's display name / picture.
+  - `PATCH /api/admin/freelancers/{id}/subscription` — admin grants/revokes a
+    subscription (`active: true/false`); activating sets a 1-year expiry and makes the
+    freelancer visible in the marketplace.
+  - `POST /api/admin/dev-setup` (gated by `SEED_SECRET`, 404 when unset) —
+    create/promote a user to a role and optionally reset their password (test only).
+- `frontend/src/pages/EditProfile.jsx` — new **Personal Details** section (Full Name,
+  Phone, Date of birth, Country dropdown, Street address, City, country-aware
+  State/Province, country-aware postal code with validation) and a **Specialties**
+  editor. Name is saved via `PUT /api/auth/me`; profile fields via the profile PUT.
+- `frontend/src/pages/Admin.jsx` — subscription toggle (⚡) on each freelancer row.
+
+**Verified (live)** admin `freelanceo@freelanceo.com` created with role admin, logs in
+and reaches `/api/admin/*`.
+
+---
+
 ## 2026-07-06 — Fix job detail blank screen + missing reviews
 
 **Summary:** Clicking a job showed a blank screen (and the browser Back button then
