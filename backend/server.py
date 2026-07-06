@@ -521,6 +521,7 @@ async def list_freelancers(
     category: Optional[str] = None,
     skills: Optional[str] = None,
     min_rating: Optional[float] = None,
+    country: Optional[str] = None,
     search: Optional[str] = None,
     page: int = 1,
     limit: int = 12
@@ -531,6 +532,9 @@ async def list_freelancers(
     if category:
         query["category"] = category
     
+    if country:
+        query["country"] = country
+    
     if skills:
         skill_list = [s.strip() for s in skills.split(",")]
         query["skills"] = {"$in": skill_list}
@@ -539,11 +543,20 @@ async def list_freelancers(
         query["average_rating"] = {"$gte": min_rating}
     
     if search:
-        query["$or"] = [
+        # Match profile fields OR the freelancer's name (name lives on the users doc).
+        name_matches = await db.users.find(
+            {"role": "freelancer", "name": {"$regex": search, "$options": "i"}},
+            {"id": 1, "_id": 0},
+        ).to_list(1000)
+        matching_ids = [u["id"] for u in name_matches]
+        or_clauses = [
             {"title": {"$regex": search, "$options": "i"}},
             {"bio": {"$regex": search, "$options": "i"}},
-            {"skills": {"$elemMatch": {"$regex": search, "$options": "i"}}}
+            {"skills": {"$elemMatch": {"$regex": search, "$options": "i"}}},
         ]
+        if matching_ids:
+            or_clauses.append({"user_id": {"$in": matching_ids}})
+        query["$or"] = or_clauses
     
     skip = (page - 1) * limit
     
@@ -562,6 +575,16 @@ async def list_freelancers(
         "page": page,
         "pages": (total + limit - 1) // limit
     }
+
+@api_router.get("/freelancers/countries")
+async def list_freelancer_countries():
+    """Distinct countries that have active, visible freelancers (for filters)."""
+    profiles = await db.freelancer_profiles.find(
+        {"subscription_status": "active", "is_suspended": {"$ne": True}},
+        {"_id": 0, "country": 1},
+    ).to_list(2000)
+    countries = sorted({(p.get("country") or "").strip() for p in profiles if (p.get("country") or "").strip()})
+    return countries
 
 @api_router.get("/freelancers/featured")
 async def get_featured_freelancers():

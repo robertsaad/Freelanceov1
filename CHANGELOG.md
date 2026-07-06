@@ -6,6 +6,25 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Freelancer search by name + country filter
+
+**Summary:** Searching the talent marketplace by a freelancer's name now works, and a
+Country filter was added alongside Category.
+
+**Fixed / Added**
+- `backend/server.py`
+  - `GET /api/freelancers` search now also matches the freelancer's **name** (looked up
+    on the users collection and OR'd into the query) — previously only title/bio/skills.
+  - New `country` filter param on `GET /api/freelancers`.
+  - New `GET /api/freelancers/countries` — distinct countries of active freelancers.
+- `frontend/src/pages/FreelancersList.jsx` — added a **Country** dropdown filter (fed by
+  the new endpoint) next to Category; wired into the query + URL params.
+
+**Tested (local)** search "Sarah" → Sarah Johnson; "garcia" → Maria Garcia; country
+= Lebanon → Omar Haddad.
+
+---
+
 ## 2026-07-06 — Client hiring hub + role-based search
 
 **Summary:** Reworked the client's landing (dashboard) into a hire-focused hub and

@@ -22,11 +22,17 @@ export default function FreelancersList() {
 
   const search = searchParams.get("search") || "";
   const category = searchParams.get("category") || "";
+  const country = searchParams.get("country") || "";
   const page = parseInt(searchParams.get("page") || "1");
+  const [countries, setCountries] = useState([]);
 
   useEffect(() => {
     fetchFreelancers();
-  }, [search, category, page]);
+  }, [search, category, country, page]);
+
+  useEffect(() => {
+    axios.get(`${API}/freelancers/countries`).then((r) => setCountries(r.data || [])).catch(() => {});
+  }, []);
 
   const fetchFreelancers = async () => {
     setLoading(true);
@@ -34,6 +40,7 @@ export default function FreelancersList() {
       const params = new URLSearchParams();
       if (search) params.append("search", search);
       if (category && category !== "All Categories") params.append("category", category);
+      if (country && country !== "All Countries") params.append("country", country);
       params.append("page", page.toString());
       params.append("limit", "12");
 
@@ -65,6 +72,17 @@ export default function FreelancersList() {
       newParams.set("category", value);
     } else {
       newParams.delete("category");
+    }
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
+  const handleCountryChange = (value) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (value && value !== "All Countries") {
+      newParams.set("country", value);
+    } else {
+      newParams.delete("country");
     }
     newParams.set("page", "1");
     setSearchParams(newParams);
@@ -108,6 +126,20 @@ export default function FreelancersList() {
                 {categories.map((cat) => (
                   <SelectItem key={cat} value={cat} data-testid={`category-option-${cat}`}>
                     {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={country || "All Countries"} onValueChange={handleCountryChange}>
+              <SelectTrigger className="w-full sm:w-48" data-testid="country-select">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Country" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="All Countries">All Countries</SelectItem>
+                {countries.map((c) => (
+                  <SelectItem key={c} value={c} data-testid={`country-option-${c}`}>
+                    {c}
                   </SelectItem>
                 ))}
               </SelectContent>
