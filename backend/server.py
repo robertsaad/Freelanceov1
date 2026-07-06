@@ -2046,8 +2046,12 @@ async def list_jobs(
     
     skip = (page - 1) * limit
     
-    jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    total = await db.jobs.count_documents(query)
+    # Cosmos (Mongo API) rejects server-side .sort() on non-indexed fields here,
+    # so fetch matching jobs and sort/paginate in Python.
+    all_jobs = await db.jobs.find(query, {"_id": 0}).to_list(1000)
+    all_jobs.sort(key=lambda j: j.get("created_at") or "", reverse=True)
+    total = len(all_jobs)
+    jobs = all_jobs[skip:skip + limit]
     
     # Return limited or full info based on subscription
     if not has_subscription:
@@ -2091,7 +2095,9 @@ async def get_featured_jobs():
     jobs = await db.jobs.find(
         {"status": "open"},
         {"_id": 0}
-    ).sort("created_at", -1).limit(6).to_list(6)
+    ).to_list(200)
+    jobs.sort(key=lambda j: j.get("created_at") or "", reverse=True)
+    jobs = jobs[:6]
     
     for job in jobs:
         client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
@@ -2108,7 +2114,8 @@ async def get_my_jobs(request: Request):
     if user["role"] != "client":
         raise HTTPException(status_code=403, detail="Only clients can view their jobs")
     
-    jobs = await db.jobs.find({"client_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    jobs = await db.jobs.find({"client_id": user["id"]}, {"_id": 0}).to_list(200)
+    jobs.sort(key=lambda j: j.get("created_at") or "", reverse=True)
     
     return jobs
 
