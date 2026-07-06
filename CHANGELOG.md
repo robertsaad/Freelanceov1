@@ -6,6 +6,25 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Admin: separate Admins / Clients / Freelancers tabs
+
+**Summary:** Restructured the Admin dashboard so identities are grouped the way they'll
+map to production identity providers: an **Admins** tab (platform managers → Entra ID),
+a **Clients** tab and a **Freelancers** tab (both → Entra External ID). The Freelancers
+tab now shows the actual user (name + email) instead of only the profile title.
+
+**Changed** (`frontend/src/pages/Admin.jsx`)
+- Tabs are now: **Admins, Clients, Freelancers, Jobs, Categories, Payments** (default
+  Admins).
+- `UsersTab` is role-aware (`role` + `title` + `subtitle` props) and passes `role` to
+  `/admin/users`; used for both Admins (`role=admin`) and Clients (`role=client`), each
+  with a note about the future Entra provider.
+- Freelancers tab: columns are now **Name, Email, Category, Subscription, Rating,
+  Actions** (title shown as sub-text under the name; Featured/Suspended shown as small
+  badges). Keeps the ⚡ subscription, ⭐ feature, suspend and delete actions.
+
+---
+
 ## 2026-07-06 — Fix admin page (and other lists) failing to load
 
 **Summary:** The Admin page showed "failed to load users" and no data, because the

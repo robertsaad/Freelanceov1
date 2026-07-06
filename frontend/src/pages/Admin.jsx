@@ -4,7 +4,7 @@ import { useAuth } from "@/App";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MobileNav from "@/components/MobileNav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -107,7 +107,7 @@ function ConfirmDelete({ onConfirm, label = "Delete" }) {
 export default function Admin() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
-  const [tab, setTab] = useState("users");
+  const [tab, setTab] = useState("admins");
 
   const loadStats = useCallback(async () => {
     try {
@@ -164,15 +164,19 @@ export default function Admin() {
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="mb-4">
-            <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
+            <TabsTrigger value="admins" data-testid="tab-admins">Admins</TabsTrigger>
+            <TabsTrigger value="clients" data-testid="tab-clients">Clients</TabsTrigger>
             <TabsTrigger value="freelancers" data-testid="tab-freelancers">Freelancers</TabsTrigger>
             <TabsTrigger value="jobs" data-testid="tab-jobs">Jobs</TabsTrigger>
             <TabsTrigger value="categories" data-testid="tab-categories">Categories</TabsTrigger>
             <TabsTrigger value="payments" data-testid="tab-payments">Payments</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="users">
-            <UsersTab currentUserId={user?.id} onChange={loadStats} />
+          <TabsContent value="admins">
+            <UsersTab role="admin" title="Platform Admins" subtitle="Users who manage the platform. These will move to Microsoft Entra ID in production." currentUserId={user?.id} onChange={loadStats} />
+          </TabsContent>
+          <TabsContent value="clients">
+            <UsersTab role="client" title="Clients" subtitle="Client accounts that post jobs and hire freelancers. These will move to Entra External ID in production." currentUserId={user?.id} onChange={loadStats} />
           </TabsContent>
           <TabsContent value="freelancers">
             <FreelancersTab onChange={loadStats} />
@@ -209,7 +213,7 @@ function SearchBar({ value, onChange, placeholder }) {
   );
 }
 
-function UsersTab({ currentUserId, onChange }) {
+function UsersTab({ role, title = "Users", subtitle, currentUserId, onChange }) {
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -217,14 +221,14 @@ function UsersTab({ currentUserId, onChange }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get("/admin/users", { params: { search: search || undefined } });
+      const res = await api.get("/admin/users", { params: { search: search || undefined, role: role || undefined } });
       setItems(res.data.users);
     } catch (e) {
       toast.error("Failed to load users");
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, role]);
 
   useEffect(() => {
     const t = setTimeout(load, 300);
@@ -267,7 +271,8 @@ function UsersTab({ currentUserId, onChange }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Users</CardTitle>
+        <CardTitle className="text-lg">{title}</CardTitle>
+        {subtitle && <CardDescription>{subtitle}</CardDescription>}
       </CardHeader>
       <CardContent>
         <SearchBar value={search} onChange={setSearch} placeholder="Search by name or email" />
@@ -409,18 +414,19 @@ function FreelancersTab({ onChange }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Freelancer Profiles</CardTitle>
+        <CardTitle className="text-lg">Freelancers</CardTitle>
+        <CardDescription>Freelancer accounts and their profiles. These will move to Entra External ID in production.</CardDescription>
       </CardHeader>
       <CardContent>
         <SearchBar value={search} onChange={setSearch} placeholder="Search by title or category" />
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Title</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Subscription</TableHead>
               <TableHead>Rating</TableHead>
-              <TableHead>Flags</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -435,7 +441,17 @@ function FreelancersTab({ onChange }) {
                 const featured = p.is_featured === true;
                 return (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.title || p.user?.name || "—"}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{p.user?.name || "—"}</div>
+                      <div className="text-xs text-gray-400">{p.title || "No title"}</div>
+                      {(featured || suspended) && (
+                        <div className="flex gap-1 mt-1">
+                          {featured && <Badge className="bg-cyan-100 text-cyan-700 hover:bg-cyan-100">Featured</Badge>}
+                          {suspended && <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Suspended</Badge>}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-gray-500">{p.user?.email || "—"}</TableCell>
                     <TableCell className="text-gray-500">{p.category || "—"}</TableCell>
                     <TableCell>
                       <Badge className={p.subscription_status === "active" ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-gray-100 text-gray-600 hover:bg-gray-100"}>
@@ -443,12 +459,6 @@ function FreelancersTab({ onChange }) {
                       </Badge>
                     </TableCell>
                     <TableCell>{(p.average_rating || 0).toFixed(1)} ({p.total_reviews || 0})</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {featured && <Badge className="bg-cyan-100 text-cyan-700 hover:bg-cyan-100">Featured</Badge>}
-                        {suspended && <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Suspended</Badge>}
-                      </div>
-                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         {p.subscription_status === "active" ? (
