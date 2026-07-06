@@ -6,6 +6,30 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Fix freelancer onboarding inputs losing focus after one character
+
+**Summary:** In the freelancer onboarding wizard ("Create your profile"), typing in
+any text field (Specialties, Skills, Title, Bio, personal details, etc.) dropped focus
+after a single keystroke, forcing a re-click for every character. Root cause: the
+`OptionCard` and `StepShell` presentational components were defined *inside* the
+`FreelancerOnboarding` component, so every keystroke (state update → re-render)
+created new component identities and React remounted the whole subtree, including the
+active input. Fixed by hoisting both components to module scope (they are pure and
+props-only), giving them stable identities across renders.
+
+**Changed**
+- `frontend/src/pages/FreelancerOnboarding.jsx` — moved `OptionCard` and `StepShell`
+  out of the component body to module scope; added an explanatory comment.
+
+**Notes**
+- No behavior/markup change — purely structural. Verified no compile errors.
+- Infra (not code): resolved sign-up 500s by fronting Cosmos DB with a Private
+  Endpoint (VNet `freelanceo-vnet`, PE `freelanceo-db-pe`, private DNS zone
+  `privatelink.mongo.cosmos.azure.com`, App Service VNet integration) because Azure
+  Policy force-disables Cosmos public network access. Applied directly to Azure.
+
+---
+
 ## 2026-07-04 — Remove Emergent auth dependency (email/password only)
 
 **Summary:** Removed all dependency on Emergent Auth / Google OAuth from sign-up and

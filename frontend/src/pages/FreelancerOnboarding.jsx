@@ -71,6 +71,48 @@ const emptyEducation = () => ({
 
 const emptyLanguage = () => ({ language: "", proficiency: "Conversational" });
 
+// NOTE: These presentational components are defined at module scope (not inside
+// FreelancerOnboarding). Defining them inside the component recreates them on
+// every render, which remounts their subtree and makes text inputs lose focus
+// after a single keystroke.
+const OptionCard = ({ selected, onClick, title, desc, icon: Icon }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`w-full text-left rounded-xl border-2 p-4 transition-all flex items-start gap-3 ${
+      selected
+        ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600"
+        : "border-gray-200 hover:border-gray-300 bg-white"
+    }`}
+  >
+    {Icon && (
+      <span
+        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+          selected ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-600"
+        }`}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+    )}
+    <span className="flex-1">
+      <span className="block font-semibold text-gray-900">{title}</span>
+      {desc && <span className="block text-sm text-gray-500 mt-0.5">{desc}</span>}
+    </span>
+    {selected && <Check className="h-5 w-5 text-emerald-600 shrink-0" />}
+  </button>
+);
+
+const StepShell = ({ eyebrow, heading, subheading, children }) => (
+  <div className="max-w-2xl mx-auto">
+    {eyebrow && (
+      <p className="text-sm font-medium text-emerald-600 mb-2">{eyebrow}</p>
+    )}
+    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{heading}</h1>
+    {subheading && <p className="text-gray-500 mt-2">{subheading}</p>}
+    <div className="mt-6 space-y-4">{children}</div>
+  </div>
+);
+
 export default function FreelancerOnboarding() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -298,44 +340,6 @@ export default function FreelancerOnboarding() {
       </div>
     );
   }
-
-  const OptionCard = ({ selected, onClick, title, desc, icon: Icon }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full text-left rounded-xl border-2 p-4 transition-all flex items-start gap-3 ${
-        selected
-          ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600"
-          : "border-gray-200 hover:border-gray-300 bg-white"
-      }`}
-    >
-      {Icon && (
-        <span
-          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-            selected ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-600"
-          }`}
-        >
-          <Icon className="h-5 w-5" />
-        </span>
-      )}
-      <span className="flex-1">
-        <span className="block font-semibold text-gray-900">{title}</span>
-        {desc && <span className="block text-sm text-gray-500 mt-0.5">{desc}</span>}
-      </span>
-      {selected && <Check className="h-5 w-5 text-emerald-600 shrink-0" />}
-    </button>
-  );
-
-  const StepShell = ({ eyebrow, heading, subheading, children }) => (
-    <div className="max-w-2xl mx-auto">
-      {eyebrow && (
-        <p className="text-sm font-medium text-emerald-600 mb-2">{eyebrow}</p>
-      )}
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{heading}</h1>
-      {subheading && <p className="text-gray-500 mt-2">{subheading}</p>}
-      <div className="mt-6 space-y-4">{children}</div>
-    </div>
-  );
 
   const stepName = steps[step];
   const stepIndexLabel = `${step}/${totalWizardSteps}`;

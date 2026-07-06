@@ -40,6 +40,13 @@ test_result.md
 frontend/ios/
 frontend/android/
 
+# Foundry PM agent (separate from the app — never deploy with it)
+pm-instructions.txt
+create_pm_agent.py
+create-pm-agent.ps1
+create-pm-agent2.ps1
+caphost.json
+
 # Misc
 *.zip
 *.tar.gz
