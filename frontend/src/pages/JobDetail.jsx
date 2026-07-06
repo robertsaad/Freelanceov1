@@ -22,7 +22,8 @@ import {
   MessageSquare,
   Send,
   CheckCircle,
-  Users
+  Users,
+  Lock
 } from "lucide-react";
 
 export default function JobDetail() {

@@ -982,18 +982,21 @@ async def get_freelancer_reviews(freelancer_id: str, page: int = 1, limit: int =
     """Get reviews for a freelancer"""
     skip = (page - 1) * limit
     
-    reviews = await db.reviews.find(
+    # Cosmos (Mongo API) rejects server-side .sort() on non-indexed fields here,
+    # so fetch and sort/paginate in Python.
+    all_reviews = await db.reviews.find(
         {"freelancer_id": freelancer_id},
         {"_id": 0}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    ).to_list(1000)
+    all_reviews.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    total = len(all_reviews)
+    reviews = all_reviews[skip:skip + limit]
     
     # Get client info
     for r in reviews:
         client = await db.users.find_one({"id": r["client_id"]}, {"_id": 0, "password_hash": 0})
         if client:
             r["client"] = client
-    
-    total = await db.reviews.count_documents({"freelancer_id": freelancer_id})
     
     return {
         "reviews": reviews,
@@ -2466,9 +2469,24 @@ async def admin_seed_demo(data: SeedRequest):
         })
         return uid
 
+    # Create clients first (they are the review authors below).
+    client_ids = []
+    for c in clients:
+        cid = await _ensure_user(c["name"], c["email"], "client")
+        client_ids.append((cid, c["name"]))
+
+    review_comments = [
+        "Delivered exactly what we needed, ahead of schedule. Communication was excellent throughout.",
+        "Fantastic to work with — understood our requirements quickly and the quality was outstanding.",
+        "Reliable, skilled and responsive. The final result was polished and on-brief. Would hire again.",
+    ]
+    rating_sets = [[5, 5, 5], [5, 5, 4], [5, 4, 4]]
+
     freelancer_count = 0
-    for f in freelancers:
+    for i, f in enumerate(freelancers):
         uid = await _ensure_user(f["name"], f["email"], "freelancer")
+        ratings = rating_sets[i % len(rating_sets)]
+        avg_rating = round(sum(ratings) / len(ratings), 1)
         await db.freelancer_profiles.update_one(
             {"user_id": uid},
             {"$set": {
@@ -2478,18 +2496,25 @@ async def admin_seed_demo(data: SeedRequest):
                 "languages": f["languages"], "city": f["city"], "country": f["country"],
                 "experience_level": "expert", "goal": "main_income", "work_preference": "sell_packages",
                 "subscription_status": "active", "is_available": True, "is_featured": f["featured"],
-                "is_suspended": False, "average_rating": f["rating"], "total_reviews": f["reviews"],
+                "is_suspended": False, "average_rating": avg_rating, "total_reviews": len(ratings),
                 "portfolio_items": [], "updated_at": now,
              },
              "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": now}},
             upsert=True,
         )
+        prof = await db.freelancer_profiles.find_one({"user_id": uid}, {"_id": 0, "id": 1})
+        fid = prof.get("id") if prof else None
+        if fid:
+            for j, (cid, cname) in enumerate(client_ids):
+                if await db.reviews.find_one({"freelancer_id": fid, "client_id": cid}):
+                    continue
+                await db.reviews.insert_one({
+                    "id": str(uuid.uuid4()), "freelancer_id": fid, "client_id": cid,
+                    "rating": ratings[j % len(ratings)],
+                    "comment": review_comments[j % len(review_comments)],
+                    "created_at": now,
+                })
         freelancer_count += 1
-
-    client_ids = []
-    for c in clients:
-        cid = await _ensure_user(c["name"], c["email"], "client")
-        client_ids.append((cid, c["name"]))
 
     jobs = [
         {"c": 0, "title": "Build a React E-commerce Website", "category": "Web Development",
@@ -2538,6 +2563,7 @@ async def admin_seed_demo(data: SeedRequest):
         "freelancers": freelancer_count,
         "clients": len(client_ids),
         "jobs_added": job_count,
+        "reviews_total": await db.reviews.count_documents({}),
         "login_password": "Demo1234!",
     }
 
