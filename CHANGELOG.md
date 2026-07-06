@@ -6,6 +6,35 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Demo data seeding + jobs listing fix
+
+**Summary:** Added a secret-gated endpoint to populate the database with realistic
+demo data (10 freelancers with full profiles + active subscriptions, 3 clients, 8 job
+posts across categories) so the marketplace, homepage and jobs pages look populated.
+Also fixed a pre-existing 500 on the jobs listings.
+
+**Added**
+- `backend/server.py` — `POST /api/admin/seed-demo` (gated by the `SEED_SECRET` env
+  var; returns 404 when unset). Idempotent: upserts demo freelancer profiles
+  (`subscription_status: active`, ratings/reviews, some featured), clients, and jobs.
+  All demo accounts use password `Demo1234!`; demo emails end in `-demo.com`.
+
+**Fixed**
+- `backend/server.py` — jobs listings (`GET /api/jobs`, `/api/jobs/featured`,
+  `/api/jobs/my-jobs`) returned 500 once jobs existed, because Cosmos (Mongo API)
+  rejects server-side `.sort()` on non-indexed fields here. Now sorted in Python
+  (same pattern already used for featured freelancers).
+
+**Verified (live)**
+- 10 freelancers visible in `/api/freelancers`; featured populated.
+- 8 jobs visible to a subscribed freelancer via `/api/jobs`; homepage featured works.
+
+**Notes**
+- `SEED_SECRET` app setting is currently set (so the endpoint is callable). To lock it
+  down, remove the `SEED_SECRET` app setting — the endpoint then returns 404.
+
+---
+
 ## 2026-07-06 — CV autofill: parse resume to pre-fill the onboarding profile
 
 **Summary:** Freelancers can now upload a CV (PDF or Word) on the first onboarding
