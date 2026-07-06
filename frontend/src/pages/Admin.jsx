@@ -50,6 +50,7 @@ import {
   Plus,
   Pencil,
   Tag,
+  Zap,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -383,6 +384,17 @@ function FreelancersTab({ onChange }) {
     }
   };
 
+  const toggleSubscription = async (id, value) => {
+    try {
+      await api.patch(`/admin/freelancers/${id}/subscription`, { active: value });
+      toast.success(value ? "Subscription activated" : "Subscription deactivated");
+      load();
+      onChange();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Action failed");
+    }
+  };
+
   const remove = async (id) => {
     try {
       await api.delete(`/admin/freelancers/${id}`);
@@ -439,6 +451,15 @@ function FreelancersTab({ onChange }) {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {p.subscription_status === "active" ? (
+                          <Button variant="ghost" size="sm" className="text-green-600" onClick={() => toggleSubscription(p.id, false)} title="Deactivate subscription">
+                            <Zap className="h-4 w-4" fill="currentColor" />
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="sm" className="text-gray-400" onClick={() => toggleSubscription(p.id, true)} title="Activate subscription">
+                            <Zap className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" className={featured ? "text-cyan-600" : "text-gray-400"} onClick={() => toggleFeature(p.id, !featured)} title="Toggle featured">
                           <Star className="h-4 w-4" fill={featured ? "currentColor" : "none"} />
                         </Button>

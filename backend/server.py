@@ -456,6 +456,32 @@ async def get_me(request: Request):
         auth_provider=user["auth_provider"]
     )
 
+class AccountUpdate(BaseModel):
+    name: Optional[str] = None
+    picture: Optional[str] = None
+
+@api_router.put("/auth/me", response_model=UserResponse)
+async def update_me(data: AccountUpdate, request: Request):
+    """Update the current user's account details (display name / picture)."""
+    user = await require_auth(request)
+    updates = {}
+    if data.name is not None and data.name.strip():
+        updates["name"] = data.name.strip()
+    if data.picture is not None:
+        updates["picture"] = data.picture
+    if updates:
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.users.update_one({"id": user["id"]}, {"$set": updates})
+        user = await db.users.find_one({"id": user["id"]})
+    return UserResponse(
+        id=user["id"],
+        email=user["email"],
+        name=user["name"],
+        picture=user.get("picture"),
+        role=user["role"],
+        auth_provider=user["auth_provider"],
+    )
+
 @api_router.post("/auth/logout")
 async def logout(request: Request, response: Response):
     session_token = request.cookies.get("session_token")
@@ -2333,6 +2359,9 @@ class AdminSuspendUpdate(BaseModel):
 class AdminFeatureUpdate(BaseModel):
     is_featured: bool
 
+class AdminSubscriptionUpdate(BaseModel):
+    active: bool
+
 class AdminJobStatusUpdate(BaseModel):
     status: str  # open, closed, filled
 
@@ -2568,6 +2597,45 @@ async def admin_seed_demo(data: SeedRequest):
     }
 
 
+class DevSetupRequest(BaseModel):
+    secret: str
+    email: EmailStr
+    password: Optional[str] = None
+    role: Optional[str] = None  # defaults to "admin"
+
+
+@api_router.post("/admin/dev-setup")
+async def admin_dev_setup(data: DevSetupRequest):
+    """Create/promote a user and optionally reset their password.
+    Gated by the SEED_SECRET env var (404 when unset). For test environments only."""
+    configured = os.environ.get("SEED_SECRET", "")
+    if not configured:
+        raise HTTPException(status_code=404, detail="Not found")
+    if data.secret != configured:
+        raise HTTPException(status_code=403, detail="Invalid secret")
+
+    role = data.role or "admin"
+    if role not in ("freelancer", "client", "admin"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+
+    now = datetime.now(timezone.utc).isoformat()
+    user = await db.users.find_one({"email": data.email})
+    if user:
+        updates = {"role": role, "is_active": True, "updated_at": now}
+        if data.password:
+            updates["password_hash"] = hash_password(data.password)
+        await db.users.update_one({"id": user["id"]}, {"$set": updates})
+        action = "updated"
+    else:
+        await db.users.insert_one({
+            "id": str(uuid.uuid4()), "email": data.email, "name": data.email.split("@")[0],
+            "picture": None, "role": role, "password_hash": hash_password(data.password or "changeme123"),
+            "auth_provider": "email", "is_active": True, "created_at": now, "updated_at": now,
+        })
+        action = "created"
+    return {"message": f"User {action}", "email": data.email, "role": role, "password_reset": bool(data.password)}
+
+
 @api_router.get("/admin/stats")
 async def admin_stats(request: Request):
     """Overview counts for the admin dashboard."""
@@ -2772,6 +2840,26 @@ async def admin_feature_freelancer(profile_id: str, data: AdminFeatureUpdate, re
         {"$set": {"is_featured": data.is_featured, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     return {"message": "Profile feature updated", "is_featured": data.is_featured}
+
+
+@api_router.patch("/admin/freelancers/{profile_id}/subscription")
+async def admin_set_subscription(profile_id: str, data: AdminSubscriptionUpdate, request: Request):
+    """Grant or revoke a freelancer's subscription (makes them visible in the marketplace)."""
+    await require_admin(request)
+    profile = await db.freelancer_profiles.find_one({"id": profile_id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    now = datetime.now(timezone.utc)
+    if data.active:
+        updates = {
+            "subscription_status": "active",
+            "subscription_expires_at": (now + timedelta(days=365)).isoformat(),
+        }
+    else:
+        updates = {"subscription_status": "inactive", "subscription_expires_at": None}
+    updates["updated_at"] = now.isoformat()
+    await db.freelancer_profiles.update_one({"id": profile_id}, {"$set": updates})
+    return {"message": "Subscription updated", "subscription_status": updates["subscription_status"]}
 
 
 @api_router.delete("/admin/freelancers/{profile_id}")

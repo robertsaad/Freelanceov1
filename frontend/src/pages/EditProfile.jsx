@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Plus, X, Save, Trash2, ExternalLink, Upload, Loader2, Image as ImageIcon, Video, Music } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
+import { COUNTRIES, getAddressConfig, getPostalError } from "@/lib/locationData";
 
 const mediaSrc = (url) => {
   if (!url) return url;
@@ -22,7 +23,7 @@ const mediaSrc = (url) => {
 };
 
 export default function EditProfile() {
-  const { user } = useAuth();
+  const { user, checkAuth } = useAuth();
   const navigate = useNavigate();
   const categories = useCategories();
   const [loading, setLoading] = useState(true);
@@ -30,17 +31,27 @@ export default function EditProfile() {
   const [hasProfile, setHasProfile] = useState(false);
 
   const [formData, setFormData] = useState({
+    name: "",
     title: "",
     bio: "",
     skills: [],
+    specialties: [],
     category: "",
     hourly_rate: "",
     experience_years: "",
     location: "",
-    is_available: true
+    is_available: true,
+    phone: "",
+    date_of_birth: "",
+    country: "",
+    address: "",
+    city: "",
+    state: "",
+    zip_code: "",
   });
 
   const [newSkill, setNewSkill] = useState("");
+  const [newSpecialty, setNewSpecialty] = useState("");
   const [portfolioItems, setPortfolioItems] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [newPortfolio, setNewPortfolio] = useState({
@@ -62,16 +73,27 @@ export default function EditProfile() {
       if (response.data) {
         setHasProfile(true);
         setFormData({
+          name: user?.name || "",
           title: response.data.title || "",
           bio: response.data.bio || "",
           skills: response.data.skills || [],
+          specialties: response.data.specialties || [],
           category: response.data.category || "",
           hourly_rate: response.data.hourly_rate?.toString() || "",
           experience_years: response.data.experience_years?.toString() || "",
           location: response.data.location || "",
-          is_available: response.data.is_available ?? true
+          is_available: response.data.is_available ?? true,
+          phone: response.data.phone || "",
+          date_of_birth: response.data.date_of_birth || "",
+          country: response.data.country || "",
+          address: response.data.address || "",
+          city: response.data.city || "",
+          state: response.data.state || "",
+          zip_code: response.data.zip_code || "",
         });
         setPortfolioItems(response.data.portfolio_items || []);
+      } else {
+        setFormData((f) => ({ ...f, name: user?.name || "" }));
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -82,23 +104,37 @@ export default function EditProfile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const postalError = getPostalError(formData.country, formData.zip_code);
+    if (postalError) {
+      toast.error(postalError);
+      return;
+    }
+
     setSaving(true);
 
     try {
+      const { name, ...profileFields } = formData;
       const data = {
-        ...formData,
+        ...profileFields,
         hourly_rate: parseFloat(formData.hourly_rate),
-        experience_years: parseInt(formData.experience_years)
+        experience_years: parseInt(formData.experience_years),
       };
 
       if (hasProfile) {
         await axios.put(`${API}/freelancers/profile`, data, { withCredentials: true });
-        toast.success("Profile updated successfully!");
       } else {
         await axios.post(`${API}/freelancers/profile`, data, { withCredentials: true });
         setHasProfile(true);
-        toast.success("Profile created successfully!");
       }
+
+      // Update the account display name if it changed
+      if (name.trim() && name.trim() !== (user?.name || "")) {
+        await axios.put(`${API}/auth/me`, { name: name.trim() }, { withCredentials: true });
+        if (checkAuth) await checkAuth();
+      }
+
+      toast.success("Profile updated successfully!");
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to save profile");
     } finally {
@@ -115,6 +151,18 @@ export default function EditProfile() {
 
   const removeSkill = (skill) => {
     setFormData({ ...formData, skills: formData.skills.filter(s => s !== skill) });
+  };
+
+  const addSpecialty = () => {
+    const s = newSpecialty.trim();
+    if (s && !formData.specialties.includes(s) && formData.specialties.length < 3) {
+      setFormData({ ...formData, specialties: [...formData.specialties, s] });
+      setNewSpecialty("");
+    }
+  };
+
+  const removeSpecialty = (s) => {
+    setFormData({ ...formData, specialties: formData.specialties.filter(x => x !== s) });
   };
 
   const addPortfolioItem = async () => {
@@ -189,6 +237,9 @@ export default function EditProfile() {
       </div>
     );
   }
+
+  const addressConfig = getAddressConfig(formData.country);
+  const postalError = getPostalError(formData.country, formData.zip_code);
 
   return (
     <div className="min-h-screen bg-gray-50" data-testid="edit-profile-page">
@@ -314,6 +365,91 @@ export default function EditProfile() {
                       </button>
                     </Badge>
                   ))}
+                </div>
+              </div>
+
+              {/* Specialties */}
+              <div className="space-y-2">
+                <Label>Specialties (up to 3)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add a specialty (e.g. Landing pages)"
+                    value={newSpecialty}
+                    onChange={(e) => setNewSpecialty(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addSpecialty())}
+                  />
+                  <Button type="button" onClick={addSpecialty} variant="outline">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {formData.specialties.map((s, idx) => (
+                    <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                      {s}
+                      <button type="button" onClick={() => removeSpecialty(s)}>
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Personal Details */}
+              <div className="border-t pt-6 space-y-4">
+                <div>
+                  <h3 className="font-semibold text-gray-900">Personal Details</h3>
+                  <p className="text-sm text-gray-500">Your name, contact and location information.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="John Doe" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+1 555 123 4567" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dob">Date of birth</Label>
+                    <Input id="dob" type="date" value={formData.date_of_birth} onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Country</Label>
+                    <Select value={formData.country || undefined} onValueChange={(v) => setFormData({ ...formData, country: v, state: "", zip_code: "" })}>
+                      <SelectTrigger><SelectValue placeholder="Select a country" /></SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {COUNTRIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="address">Street address</Label>
+                    <Input id="address" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="123 Main St" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{addressConfig.cityLabel}</Label>
+                    <Input value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} placeholder={addressConfig.cityLabel} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{addressConfig.stateLabel}</Label>
+                    {addressConfig.stateOptions ? (
+                      <Select value={formData.state || undefined} onValueChange={(v) => setFormData({ ...formData, state: v })} disabled={!formData.country}>
+                        <SelectTrigger><SelectValue placeholder={`Select ${addressConfig.stateLabel.toLowerCase()}`} /></SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {addressConfig.stateOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} placeholder={addressConfig.stateLabel} />
+                    )}
+                  </div>
+                  {addressConfig.postalLabel && (
+                    <div className="space-y-2">
+                      <Label>{addressConfig.postalLabel}</Label>
+                      <Input value={formData.zip_code} onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })} placeholder={addressConfig.postalPlaceholder} className={postalError ? "border-red-400" : ""} />
+                      {postalError && <p className="text-xs text-red-500">{postalError}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
 
