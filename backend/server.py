@@ -2351,6 +2351,190 @@ async def admin_bootstrap(data: AdminBootstrapRequest):
     return {"message": f"{data.email} is now an admin"}
 
 
+class SeedRequest(BaseModel):
+    secret: str
+
+
+@api_router.post("/admin/seed-demo")
+async def admin_seed_demo(data: SeedRequest):
+    """Populate the database with demo freelancers, clients and jobs.
+    Disabled (404) unless the SEED_SECRET env var is configured. Idempotent."""
+    configured = os.environ.get("SEED_SECRET", "")
+    if not configured:
+        raise HTTPException(status_code=404, detail="Not found")
+    if data.secret != configured:
+        raise HTTPException(status_code=403, detail="Invalid secret")
+
+    now = datetime.now(timezone.utc).isoformat()
+    pw = hash_password("Demo1234!")
+
+    freelancers = [
+        {"name": "Sarah Johnson", "email": "sarah.johnson@freelanceo-demo.com", "category": "Web Development",
+         "title": "Senior Full-Stack Developer", "rate": 65, "years": 8, "city": "New York", "country": "United States",
+         "bio": "Full-stack developer with 8 years building scalable web apps for startups and enterprises. I specialize in React, Node.js and cloud architecture, and I love turning complex problems into clean, reliable products.",
+         "skills": ["React", "Node.js", "TypeScript", "PostgreSQL", "AWS", "Docker"],
+         "specialties": ["SaaS Platforms", "API Development", "Cloud Architecture"],
+         "languages": [{"language": "English", "proficiency": "Native"}, {"language": "Spanish", "proficiency": "Conversational"}],
+         "rating": 4.9, "reviews": 47, "featured": True},
+        {"name": "Ahmed Khalil", "email": "ahmed.khalil@freelanceo-demo.com", "category": "Mobile Development",
+         "title": "iOS & Android Developer", "rate": 55, "years": 6, "city": "Dubai", "country": "United Arab Emirates",
+         "bio": "Mobile engineer with 6 years shipping polished iOS and Android apps. Comfortable across Swift, Kotlin and Flutter, with a strong eye for smooth UX and performance on real devices.",
+         "skills": ["Swift", "Kotlin", "Flutter", "Firebase", "REST APIs"],
+         "specialties": ["Cross-platform Apps", "Mobile UX"],
+         "languages": [{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}],
+         "rating": 4.8, "reviews": 33, "featured": True},
+        {"name": "Maria Garcia", "email": "maria.garcia@freelanceo-demo.com", "category": "Design",
+         "title": "UI/UX Designer & Brand Strategist", "rate": 50, "years": 7, "city": "Barcelona", "country": "Spain",
+         "bio": "Product designer helping brands look and feel their best. Seven years crafting intuitive interfaces and cohesive brand systems in Figma, from first wireframe to polished design system.",
+         "skills": ["Figma", "Adobe XD", "Illustrator", "Prototyping", "Design Systems"],
+         "specialties": ["Brand Identity", "Mobile UI", "Design Systems"],
+         "languages": [{"language": "Spanish", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}, {"language": "French", "proficiency": "Conversational"}],
+         "rating": 5.0, "reviews": 58, "featured": True},
+        {"name": "David Chen", "email": "david.chen@freelanceo-demo.com", "category": "Data Science",
+         "title": "Machine Learning Engineer", "rate": 80, "years": 9, "city": "San Francisco", "country": "United States",
+         "bio": "ML engineer with 9 years turning messy data into production models. I build recommendation systems, forecasting pipelines and NLP tools using Python, TensorFlow and modern MLOps.",
+         "skills": ["Python", "TensorFlow", "PyTorch", "SQL", "Pandas", "MLOps"],
+         "specialties": ["NLP", "Forecasting", "Recommendation Systems"],
+         "languages": [{"language": "English", "proficiency": "Fluent"}, {"language": "Mandarin Chinese", "proficiency": "Native"}],
+         "rating": 4.9, "reviews": 41, "featured": False},
+        {"name": "Emily Roberts", "email": "emily.roberts@freelanceo-demo.com", "category": "Writing",
+         "title": "Content Writer & Copywriter", "rate": 40, "years": 5, "city": "London", "country": "United Kingdom",
+         "bio": "Content writer and copywriter who makes brands sound human. Five years writing SEO articles, landing pages and email campaigns that inform, engage and convert.",
+         "skills": ["SEO Writing", "Copywriting", "Editing", "Content Strategy"],
+         "specialties": ["Landing Pages", "Long-form Articles"],
+         "languages": [{"language": "English", "proficiency": "Native"}],
+         "rating": 4.7, "reviews": 29, "featured": False},
+        {"name": "Omar Haddad", "email": "omar.haddad@freelanceo-demo.com", "category": "Video Editing",
+         "title": "Video Editor & Motion Designer", "rate": 45, "years": 6, "city": "Beirut", "country": "Lebanon",
+         "bio": "Video editor and motion designer with 6 years creating promos, explainers and social content. I turn raw footage into stories that hold attention using Premiere Pro and After Effects.",
+         "skills": ["Premiere Pro", "After Effects", "DaVinci Resolve", "Motion Graphics"],
+         "specialties": ["Promotional Videos", "Motion Graphics"],
+         "languages": [{"language": "Arabic", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}, {"language": "French", "proficiency": "Conversational"}],
+         "rating": 4.8, "reviews": 36, "featured": False},
+        {"name": "Priya Sharma", "email": "priya.sharma@freelanceo-demo.com", "category": "Marketing",
+         "title": "Digital Marketing Specialist", "rate": 48, "years": 7, "city": "Bangalore", "country": "India",
+         "bio": "Digital marketer with 7 years growing brands through SEO, paid ads and social. I plan data-driven campaigns that lower acquisition cost and scale what works.",
+         "skills": ["SEO", "Google Ads", "Social Media", "Analytics", "Email Marketing"],
+         "specialties": ["Paid Acquisition", "SEO Strategy"],
+         "languages": [{"language": "English", "proficiency": "Fluent"}, {"language": "Hindi", "proficiency": "Native"}],
+         "rating": 4.6, "reviews": 24, "featured": False},
+        {"name": "Lucas Muller", "email": "lucas.muller@freelanceo-demo.com", "category": "Web Development",
+         "title": "Frontend Engineer", "rate": 58, "years": 5, "city": "Berlin", "country": "Germany",
+         "bio": "Frontend engineer focused on fast, accessible interfaces. Five years with Vue and React, building component libraries and pixel-perfect UIs that feel effortless to use.",
+         "skills": ["Vue.js", "React", "JavaScript", "CSS", "Tailwind"],
+         "specialties": ["Component Libraries", "Accessibility"],
+         "languages": [{"language": "German", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}],
+         "rating": 4.8, "reviews": 31, "featured": False},
+        {"name": "Sofia Rossi", "email": "sofia.rossi@freelanceo-demo.com", "category": "Music & Audio",
+         "title": "Music Producer & Sound Designer", "rate": 52, "years": 8, "city": "Milan", "country": "Italy",
+         "bio": "Music producer and sound designer with 8 years scoring ads, games and films. I compose, mix and master original audio that gives projects their own signature sound.",
+         "skills": ["Ableton Live", "Logic Pro", "Mixing", "Mastering", "Sound Design"],
+         "specialties": ["Original Scores", "Mixing & Mastering"],
+         "languages": [{"language": "Italian", "proficiency": "Native"}, {"language": "English", "proficiency": "Fluent"}],
+         "rating": 4.9, "reviews": 27, "featured": False},
+        {"name": "James Wilson", "email": "james.wilson@freelanceo-demo.com", "category": "Business",
+         "title": "Business Consultant & Analyst", "rate": 70, "years": 10, "city": "Toronto", "country": "Canada",
+         "bio": "Business consultant with 10 years advising startups and SMEs on strategy, finance and operations. I build clear financial models and actionable plans that help founders make confident decisions.",
+         "skills": ["Strategy", "Financial Modeling", "Excel", "Market Research"],
+         "specialties": ["Financial Modeling", "Go-to-Market Strategy"],
+         "languages": [{"language": "English", "proficiency": "Native"}, {"language": "French", "proficiency": "Conversational"}],
+         "rating": 4.7, "reviews": 22, "featured": False},
+    ]
+
+    clients = [
+        {"name": "TechStart Inc", "email": "hiring@techstart-demo.com"},
+        {"name": "Creative Agency Co", "email": "projects@creativeagency-demo.com"},
+        {"name": "Global Ventures", "email": "talent@globalventures-demo.com"},
+    ]
+
+    async def _ensure_user(name, email, role):
+        existing = await db.users.find_one({"email": email})
+        if existing:
+            return existing["id"]
+        uid = str(uuid.uuid4())
+        await db.users.insert_one({
+            "id": uid, "email": email, "name": name, "picture": None, "role": role,
+            "password_hash": pw, "auth_provider": "email", "is_active": True,
+            "created_at": now, "updated_at": now,
+        })
+        return uid
+
+    freelancer_count = 0
+    for f in freelancers:
+        uid = await _ensure_user(f["name"], f["email"], "freelancer")
+        await db.freelancer_profiles.update_one(
+            {"user_id": uid},
+            {"$set": {
+                "user_id": uid, "title": f["title"], "bio": f["bio"], "skills": f["skills"],
+                "category": f["category"], "hourly_rate": f["rate"], "experience_years": f["years"],
+                "location": f"{f['city']}, {f['country']}", "specialties": f["specialties"],
+                "languages": f["languages"], "city": f["city"], "country": f["country"],
+                "experience_level": "expert", "goal": "main_income", "work_preference": "sell_packages",
+                "subscription_status": "active", "is_available": True, "is_featured": f["featured"],
+                "is_suspended": False, "average_rating": f["rating"], "total_reviews": f["reviews"],
+                "portfolio_items": [], "updated_at": now,
+             },
+             "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": now}},
+            upsert=True,
+        )
+        freelancer_count += 1
+
+    client_ids = []
+    for c in clients:
+        cid = await _ensure_user(c["name"], c["email"], "client")
+        client_ids.append((cid, c["name"]))
+
+    jobs = [
+        {"c": 0, "title": "Build a React E-commerce Website", "category": "Web Development",
+         "description": "We need an experienced full-stack developer to build a modern e-commerce site with React and Node.js, including product catalog, cart, Stripe checkout and an admin dashboard.",
+         "skills": ["React", "Node.js", "Stripe", "MongoDB"], "bmin": 3000, "bmax": 5000, "btype": "fixed", "dur": "1-3 months"},
+        {"c": 0, "title": "iOS App for Fitness Tracking", "category": "Mobile Development",
+         "description": "Looking for an iOS developer to build a fitness tracking app with HealthKit integration, workout logging, charts and social sharing.",
+         "skills": ["Swift", "HealthKit", "iOS"], "bmin": 4000, "bmax": 7000, "btype": "fixed", "dur": "2-4 months"},
+        {"c": 1, "title": "Brand Identity & Logo Design", "category": "Design",
+         "description": "Early-stage startup needs a complete brand identity: logo, color palette, typography and a simple brand guidelines document.",
+         "skills": ["Figma", "Illustrator", "Branding"], "bmin": 800, "bmax": 1500, "btype": "fixed", "dur": "2-4 weeks"},
+        {"c": 1, "title": "Promotional Video Editing (60s)", "category": "Video Editing",
+         "description": "Edit a 60-second promotional video from provided footage, including motion graphics, captions, music and color grading for social media.",
+         "skills": ["Premiere Pro", "After Effects", "Motion Graphics"], "bmin": 600, "bmax": 1200, "btype": "fixed", "dur": "1-2 weeks"},
+        {"c": 2, "title": "Data Pipeline & ML Forecasting Model", "category": "Data Science",
+         "description": "Build a data pipeline and a demand-forecasting model in Python. Includes data cleaning, feature engineering, model training and a simple reporting dashboard.",
+         "skills": ["Python", "TensorFlow", "SQL", "Pandas"], "bmin": 60, "bmax": 100, "btype": "hourly", "dur": "3-6 months"},
+        {"c": 2, "title": "SEO Blog Content (10 Articles)", "category": "Writing",
+         "description": "Write 10 SEO-optimized blog articles (1200-1500 words each) on SaaS and productivity topics, with keyword research and internal linking.",
+         "skills": ["SEO Writing", "Copywriting", "Content Strategy"], "bmin": 500, "bmax": 1000, "btype": "fixed", "dur": "2-4 weeks"},
+        {"c": 0, "title": "SEO & Google Ads Campaign", "category": "Marketing",
+         "description": "Plan and run a 3-month SEO and Google Ads campaign to grow qualified leads. Includes keyword strategy, ad setup, landing-page recommendations and monthly reporting.",
+         "skills": ["SEO", "Google Ads", "Analytics"], "bmin": 1500, "bmax": 3000, "btype": "fixed", "dur": "1-3 months"},
+        {"c": 1, "title": "Business Plan & Financial Model", "category": "Business",
+         "description": "Prepare a business plan and 3-year financial model for a fundraising round, including market sizing, unit economics and a pitch-ready summary.",
+         "skills": ["Strategy", "Financial Modeling", "Excel"], "bmin": 1000, "bmax": 2500, "btype": "fixed", "dur": "2-4 weeks"},
+    ]
+
+    job_count = 0
+    for j in jobs:
+        cid, cname = client_ids[j["c"]]
+        exists = await db.jobs.find_one({"client_id": cid, "title": j["title"]})
+        if exists:
+            continue
+        await db.jobs.insert_one({
+            "id": str(uuid.uuid4()), "client_id": cid, "title": j["title"],
+            "description": j["description"], "category": j["category"], "skills_required": j["skills"],
+            "budget_min": j["bmin"], "budget_max": j["bmax"], "budget_type": j["btype"],
+            "duration": j["dur"], "location": None, "remote": True, "status": "open",
+            "applications_count": 0, "created_at": now, "updated_at": now,
+        })
+        job_count += 1
+
+    return {
+        "message": "Demo data seeded",
+        "freelancers": freelancer_count,
+        "clients": len(client_ids),
+        "jobs_added": job_count,
+        "login_password": "Demo1234!",
+    }
+
+
 @api_router.get("/admin/stats")
 async def admin_stats(request: Request):
     """Overview counts for the admin dashboard."""
