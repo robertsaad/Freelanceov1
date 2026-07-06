@@ -1140,7 +1140,8 @@ async def get_conversation(other_user_id: str, request: Request):
             ]
         },
         {"_id": 0}
-    ).sort("created_at", 1).to_list(100)
+    ).to_list(1000)
+    messages.sort(key=lambda d: d.get("created_at") or "")
     
     # Mark messages as read
     await db.messages.update_many(
@@ -1197,7 +1198,8 @@ async def get_hiring_requests(request: Request):
             return []
         query = {"freelancer_id": profile["id"]}
     
-    requests = await db.hiring_requests.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    requests = await db.hiring_requests.find(query, {"_id": 0}).to_list(1000)
+    requests.sort(key=lambda d: d.get("created_at") or "", reverse=True)
     
     # Enrich with user/freelancer info
     for req in requests:
@@ -1365,7 +1367,9 @@ async def get_contracts(request: Request, status: Optional[str] = None,
     sort_field = sort if sort in ("started_at", "created_at", "title") else "started_at"
     direction = 1 if order == "asc" else -1
 
-    contracts = await db.contracts.find(query, {"_id": 0}).sort(sort_field, direction).to_list(200)
+    contracts = await db.contracts.find(query, {"_id": 0}).to_list(1000)
+    contracts.sort(key=lambda d: d.get(sort_field) or "", reverse=(direction == -1))
+    contracts = contracts[:200]
     for c in contracts:
         await _enrich_contract(c, user["role"])
     return contracts
@@ -1792,7 +1796,9 @@ async def get_posts(page: int = 1, limit: int = 20):
     """Get all posts (public feed)"""
     skip = (page - 1) * limit
     
-    posts = await db.posts.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    all_posts = await db.posts.find({}, {"_id": 0}).to_list(2000)
+    all_posts.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    posts = all_posts[skip:skip + limit]
     
     for post in posts:
         post_user = await db.users.find_one({"id": post["user_id"]}, {"_id": 0, "password_hash": 0})
@@ -1825,10 +1831,12 @@ async def get_feed(request: Request, page: int = 1, limit: int = 20):
     
     skip = (page - 1) * limit
     
-    posts = await db.posts.find(
+    all_posts = await db.posts.find(
         {"freelancer_id": {"$in": freelancer_ids}},
         {"_id": 0}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    ).to_list(2000)
+    all_posts.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    posts = all_posts[skip:skip + limit]
     
     for post in posts:
         post_user = await db.users.find_one({"id": post["user_id"]}, {"_id": 0, "password_hash": 0})
@@ -1926,10 +1934,12 @@ async def get_notifications(request: Request, page: int = 1, limit: int = 20):
     
     skip = (page - 1) * limit
     
-    notifications = await db.notifications.find(
+    all_notifications = await db.notifications.find(
         {"user_id": user["id"]},
         {"_id": 0}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    ).to_list(2000)
+    all_notifications.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    notifications = all_notifications[skip:skip + limit]
     
     total = await db.notifications.count_documents({"user_id": user["id"]})
     unread = await db.notifications.count_documents({"user_id": user["id"], "is_read": False})
@@ -2332,7 +2342,8 @@ async def get_my_applications(request: Request):
     if user["role"] != "freelancer":
         raise HTTPException(status_code=403, detail="Only freelancers can view applications")
     
-    applications = await db.job_applications.find({"freelancer_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    applications = await db.job_applications.find({"freelancer_id": user["id"]}, {"_id": 0}).to_list(1000)
+    applications.sort(key=lambda d: d.get("created_at") or "", reverse=True)
     
     # Get job info for each application
     for app in applications:
@@ -2707,10 +2718,12 @@ async def admin_list_users(
         ]
 
     skip = (page - 1) * limit
-    users = await db.users.find(
+    all_users = await db.users.find(
         query, {"_id": 0, "password_hash": 0}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    total = await db.users.count_documents(query)
+    ).to_list(5000)
+    all_users.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    total = len(all_users)
+    users = all_users[skip:skip + limit]
 
     return {
         "users": users,
@@ -2796,10 +2809,12 @@ async def admin_list_freelancers(
         ]
 
     skip = (page - 1) * limit
-    profiles = await db.freelancer_profiles.find(
+    all_profiles = await db.freelancer_profiles.find(
         query, {"_id": 0}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    total = await db.freelancer_profiles.count_documents(query)
+    ).to_list(5000)
+    all_profiles.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    total = len(all_profiles)
+    profiles = all_profiles[skip:skip + limit]
 
     for p in profiles:
         u = await db.users.find_one({"id": p["user_id"]}, {"_id": 0, "password_hash": 0})
@@ -2894,10 +2909,12 @@ async def admin_list_jobs(
         ]
 
     skip = (page - 1) * limit
-    jobs = await db.jobs.find(
+    all_jobs_admin = await db.jobs.find(
         query, {"_id": 0}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    total = await db.jobs.count_documents(query)
+    ).to_list(5000)
+    all_jobs_admin.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    total = len(all_jobs_admin)
+    jobs = all_jobs_admin[skip:skip + limit]
 
     for j in jobs:
         c = await db.users.find_one({"id": j["client_id"]}, {"_id": 0, "password_hash": 0})
@@ -2950,10 +2967,12 @@ async def admin_list_payments(
     await require_admin(request)
 
     skip = (page - 1) * limit
-    transactions = await db.payment_transactions.find(
+    all_tx = await db.payment_transactions.find(
         {}, {"_id": 0, "metadata": 0}
-    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
-    total = await db.payment_transactions.count_documents({})
+    ).to_list(5000)
+    all_tx.sort(key=lambda d: d.get("created_at") or "", reverse=True)
+    total = len(all_tx)
+    transactions = all_tx[skip:skip + limit]
 
     for t in transactions:
         u = await db.users.find_one({"id": t.get("user_id")}, {"_id": 0, "password_hash": 0})
