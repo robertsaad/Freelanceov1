@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useCategories } from "@/hooks/useCategories";
 import {
   User,
   MessageSquare,
@@ -24,11 +25,17 @@ import {
   Circle,
   BarChart3,
   HeartPulse,
-  FileSignature
+  FileSignature,
+  Search,
+  Briefcase,
+  ShieldCheck,
+  ChevronRight,
+  Building
 } from "lucide-react";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const categories = useCategories();
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -339,21 +346,68 @@ export default function Dashboard() {
         {/* Client Dashboard */}
         {user?.role === "client" && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link to="/freelancers" data-testid="browse-freelancers-card">
-                <Card className="hover:border-cyan-200 cursor-pointer transition-colors h-full">
-                  <CardContent className="p-6 flex items-center gap-4">
-                    <div className="h-12 w-12 bg-cyan-100 rounded-full flex items-center justify-center">
-                      <User className="h-6 w-6 text-cyan-600" />
+            {/* Hero */}
+            <Card className="mb-8 border-0 shadow-sm bg-gradient-to-br from-cyan-50 to-white">
+              <CardContent className="p-8 md:p-12 text-center">
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+                  Hire proven freelancers who deliver results
+                </h2>
+                <p className="text-gray-600 mt-3 max-w-2xl mx-auto">
+                  Post a job and get proposals fast. See work history, reviews and ratings — then hire
+                  the right talent in a few clicks.
+                </p>
+                <div className="flex flex-wrap justify-center gap-3 mt-6">
+                  <Button size="lg" className="bg-cyan-600 hover:bg-cyan-700" asChild data-testid="hero-post-job">
+                    <Link to="/jobs/post">Post a job</Link>
+                  </Button>
+                  <Button size="lg" variant="outline" asChild data-testid="hero-browse-freelancers">
+                    <Link to="/freelancers">
+                      <Search className="h-4 w-4 mr-2" /> Browse freelancers
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Safe & secure hiring */}
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Safe and secure hiring, for any size of work</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+              {[
+                { icon: Star, title: "Verified reviews", desc: "Work with highly rated professionals backed by real reviews." },
+                { icon: ShieldCheck, title: "Protected payments", desc: "Hassle-free billing so you can focus on the work that matters." },
+                { icon: Briefcase, title: "Hire who you need", desc: "Find pros who can start right away and handle any job." },
+              ].map((f) => (
+                <Card key={f.title}>
+                  <CardContent className="p-6">
+                    <div className="h-10 w-10 rounded-lg bg-cyan-100 flex items-center justify-center mb-3">
+                      <f.icon className="h-5 w-5 text-cyan-600" />
                     </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Browse Freelancers</h3>
-                      <p className="text-sm text-gray-500">Find talent for your project</p>
-                    </div>
+                    <h3 className="font-semibold text-gray-900">{f.title}</h3>
+                    <p className="text-sm text-gray-500 mt-1">{f.desc}</p>
                   </CardContent>
                 </Card>
-              </Link>
+              ))}
+            </div>
 
+            {/* Categories to hire */}
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Choose a category to see talent for hire</h2>
+            <div className="rounded-xl border bg-white divide-y mb-10">
+              {categories.map((c) => (
+                <Link
+                  key={c}
+                  to={`/freelancers?category=${encodeURIComponent(c)}`}
+                  className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+                  data-testid={`hire-category-${c}`}
+                >
+                  <span className="font-medium text-gray-800">{c}</span>
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                </Link>
+              ))}
+            </div>
+
+            {/* Manage hiring */}
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Manage your hiring</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Link to="/dashboard/messages" data-testid="messages-card">
                 <Card className="hover:border-cyan-200 cursor-pointer transition-colors h-full">
                   <CardContent className="p-6 flex items-center gap-4">
@@ -391,6 +445,20 @@ export default function Dashboard() {
                     <div>
                       <h3 className="font-medium text-gray-900">Contracts</h3>
                       <p className="text-sm text-gray-500">Engagements with freelancers</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link to="/dashboard/company" data-testid="company-card">
+                <Card className="hover:border-cyan-200 cursor-pointer transition-colors h-full">
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="h-12 w-12 bg-cyan-100 rounded-full flex items-center justify-center">
+                      <Building className="h-6 w-6 text-cyan-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">Company Settings</h3>
+                      <p className="text-sm text-gray-500">Business details &amp; contact</p>
                     </div>
                   </CardContent>
                 </Card>

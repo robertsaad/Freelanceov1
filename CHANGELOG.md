@@ -6,6 +6,22 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Client hiring hub + role-based search
+
+**Summary:** Reworked the client's landing (dashboard) into a hire-focused hub and
+enforced role-based navigation — clients search freelancers, freelancers search jobs.
+
+**Changed**
+- `frontend/src/pages/Dashboard.jsx` — client view now has a hero ("Hire proven
+  freelancers who deliver results" + Post a job / Browse freelancers), a "safe & secure
+  hiring" strip, a category list linking to the talent marketplace, and quick links
+  (Messages, Requests, Contracts, Company Settings).
+- `frontend/src/components/Navbar.jsx` — "Find Talent" is hidden for freelancers and
+  "Find Work/Find Jobs" for clients (desktop + mobile); "Post a Job" now links to
+  `/jobs/post` and shows for clients.
+
+---
+
 ## 2026-07-06 — Client experience: sign-up flow, business onboarding, job wizard, company settings
 
 **Summary:** Built out the client (hiring) side to mirror an Upwork-style flow — a

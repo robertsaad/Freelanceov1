@@ -58,7 +58,8 @@ export default function Navbar() {
 
             {/* Desktop Navigation with Mega Menus */}
             <div className="hidden lg:flex items-center gap-6">
-              {/* Find Talent Dropdown */}
+              {/* Find Talent Dropdown — hidden for freelancers (they search jobs, not talent) */}
+              {user?.role !== "freelancer" && (
               <div 
                 className="relative"
                 onMouseEnter={() => setFindTalentOpen(true)}
@@ -95,7 +96,7 @@ export default function Navbar() {
                           </Link>
                           
                           <Link 
-                            to="/pricing"
+                            to="/jobs/post"
                             className="block p-3 rounded-lg hover:bg-gray-50 transition-colors group mt-2"
                             onClick={() => setFindTalentOpen(false)}
                           >
@@ -144,6 +145,7 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Find Work Dropdown - Only for non-clients */}
               {user?.role !== "client" && (
@@ -352,20 +354,33 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-gray-100 bg-white" data-testid="mobile-menu">
           <div className="px-4 py-4 space-y-3">
-            <Link
-              to="/freelancers"
-              className="block py-2 text-gray-600 hover:text-cyan-600 font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Browse Freelancers
-            </Link>
-            <Link
-              to="/jobs"
-              className="block py-2 text-gray-600 hover:text-cyan-600 font-medium"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Find Jobs
-            </Link>
+            {user?.role !== "freelancer" && (
+              <Link
+                to="/freelancers"
+                className="block py-2 text-gray-600 hover:text-cyan-600 font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Browse Freelancers
+              </Link>
+            )}
+            {user?.role !== "client" && (
+              <Link
+                to="/jobs"
+                className="block py-2 text-gray-600 hover:text-cyan-600 font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Find Jobs
+              </Link>
+            )}
+            {user?.role === "client" && (
+              <Link
+                to="/jobs/post"
+                className="block py-2 text-gray-600 hover:text-cyan-600 font-medium"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Post a Job
+              </Link>
+            )}
             <Link
               to="/pricing"
               className="block py-2 text-gray-600 hover:text-cyan-600 font-medium"
