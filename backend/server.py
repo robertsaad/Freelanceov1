@@ -807,12 +807,24 @@ def _extract_cv_text(data: bytes, kind: str) -> str:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(data))
         return "\n".join((page.extract_text() or "") for page in reader.pages)
-    from docx import Document
-    doc = Document(io.BytesIO(data))
-    parts = [p.text for p in doc.paragraphs]
-    for table in doc.tables:
-        for row in table.rows:
-            parts.append(" ".join(cell.text for cell in row.cells))
+    # DOCX: a .docx is a zip of XML parts. Read the text directly from the
+    # document/header/footer parts using the stdlib (no python-docx/lxml needed).
+    import zipfile
+    import html
+    parts = []
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        names = [n for n in zf.namelist() if re.match(r"word/(document|header\d*|footer\d*)\.xml$", n)]
+        # Ensure the main document comes first, then headers/footers.
+        names.sort(key=lambda n: (0 if "document" in n else 1, n))
+        for name in names:
+            try:
+                xml = zf.read(name).decode("utf-8", errors="ignore")
+            except KeyError:
+                continue
+            # Preserve paragraph and tab boundaries, then strip all tags.
+            xml = xml.replace("</w:p>", "\n").replace("<w:tab/>", "\t").replace("<w:br/>", "\n")
+            text = re.sub(r"<[^>]+>", "", xml)
+            parts.append(html.unescape(text))
     return "\n".join(parts)
 
 
