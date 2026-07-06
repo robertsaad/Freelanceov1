@@ -281,6 +281,14 @@ export default function Navbar() {
                       </Link>
                     </DropdownMenuItem>
                   )}
+                  {user.role === "client" && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard/company" className="flex items-center gap-2" data-testid="company-settings-link">
+                        <Building className="h-4 w-4" />
+                        Company Settings
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
                     <Link to="/dashboard/messages" className="flex items-center gap-2" data-testid="messages-link">
                       <MessageSquare className="h-4 w-4" />

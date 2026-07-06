@@ -6,6 +6,40 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Client experience: sign-up flow, business onboarding, job wizard, company settings
+
+**Summary:** Built out the client (hiring) side to mirror an Upwork-style flow — a
+role-aware sign-up, a business-context onboarding step, a 5-step guided job-post
+wizard, and a company settings/profile page.
+
+**Added**
+- `backend/server.py`
+  - `client_profiles` collection + `ClientProfileCreate/Update` models.
+  - `GET /api/clients/profile/me`, `POST/PUT /api/clients/profile` (idempotent upsert).
+  - Job scope fields on `JobPostCreate/Update` + job doc: `project_size`,
+    `experience_level`, `contract_to_hire`.
+- `frontend/src/pages/ClientOnboarding.jsx` — "Welcome to Freelanceo!" business context
+  (company name, website, org size, industry, country) → saves company profile.
+- `frontend/src/pages/ClientSettings.jsx` — client company settings (account name,
+  company details, contact & country-aware address). Route `/dashboard/company`.
+
+**Changed**
+- `frontend/src/pages/Register.jsx` — role-aware sign-up ("Sign up to hire talent" vs
+  "find work"), First/Last name, work email, 8+ char password, country dropdown,
+  marketing + Terms checkboxes; clients route to `/client-onboarding`.
+- `frontend/src/pages/PostJob.jsx` — rebuilt as a 5-step wizard: Title → Skills (+
+  category) → Scope (size, duration, experience, contract-to-hire) → Budget
+  (hourly/fixed, from/to) → Description, with a review step and progress bar.
+- `frontend/src/App.js` — routes for `/client-onboarding` and `/dashboard/company`.
+- `frontend/src/components/Navbar.jsx` — "Company Settings" link for clients.
+
+**Tested (local mock DB)** register→client, save/get company profile, and job post with
+scope fields all return 200. Frontend build passes.
+
+**Not deployed** — committed locally for local testing per the cost-saving workflow.
+
+---
+
 ## 2026-07-06 — Local dev loop (mock DB + auto-seed), no Azure needed
 
 **Summary:** You can now run and fully test the app locally without touching Azure

@@ -217,6 +217,23 @@ class FreelancerProfileUpdate(BaseModel):
     zip_code: Optional[str] = None
     profile_photo: Optional[str] = None
 
+class ClientProfileCreate(BaseModel):
+    company_name: Optional[str] = None
+    website: Optional[str] = None
+    org_size: Optional[str] = None  # just_me, 2_9, 10_99, 100_499, 500_4999, 5000_plus
+    industry: Optional[str] = None
+    description: Optional[str] = None
+    phone: Optional[str] = None
+    country: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
+    logo: Optional[str] = None
+
+class ClientProfileUpdate(ClientProfileCreate):
+    pass
+
 class AddPortfolioItem(BaseModel):
     title: str
     description: str
@@ -270,6 +287,9 @@ class JobPostCreate(BaseModel):
     duration: Optional[str] = None  # e.g., "1-2 weeks", "1-3 months"
     location: Optional[str] = None
     remote: bool = True
+    project_size: Optional[str] = None  # small, medium, large
+    experience_level: Optional[str] = None  # entry, intermediate, expert
+    contract_to_hire: Optional[bool] = None
 
 class JobPostUpdate(BaseModel):
     title: Optional[str] = None
@@ -282,6 +302,9 @@ class JobPostUpdate(BaseModel):
     duration: Optional[str] = None
     location: Optional[str] = None
     remote: Optional[bool] = None
+    project_size: Optional[str] = None
+    experience_level: Optional[str] = None
+    contract_to_hire: Optional[bool] = None
     status: Optional[str] = None  # open, closed, filled
 
 # ==================== AUTH HELPERS ====================
@@ -698,6 +721,38 @@ async def update_freelancer_profile(data: FreelancerProfileUpdate, request: Requ
     
     updated = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
     return updated
+
+# ==================== CLIENT PROFILE ENDPOINTS ====================
+
+@api_router.get("/clients/profile/me")
+async def get_my_client_profile(request: Request):
+    """Get the current client's business profile (or null if none yet)."""
+    user = await require_auth(request)
+    profile = await db.client_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+    return profile
+
+@api_router.post("/clients/profile")
+async def upsert_client_profile(data: ClientProfileCreate, request: Request):
+    """Create or update the current client's business profile (idempotent upsert)."""
+    user = await require_auth(request)
+    if user["role"] != "client":
+        raise HTTPException(status_code=403, detail="Only clients can create a company profile")
+
+    now = datetime.now(timezone.utc).isoformat()
+    fields = {k: v for k, v in data.model_dump().items() if v is not None}
+    fields["user_id"] = user["id"]
+    fields["updated_at"] = now
+    await db.client_profiles.update_one(
+        {"user_id": user["id"]},
+        {"$set": fields, "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": now}},
+        upsert=True,
+    )
+    return await db.client_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+
+@api_router.put("/clients/profile")
+async def update_client_profile(data: ClientProfileUpdate, request: Request):
+    """Update the current client's business profile."""
+    return await upsert_client_profile(data, request)
 
 @api_router.post("/freelancers/portfolio")
 async def add_portfolio_item(data: AddPortfolioItem, request: Request):
@@ -2006,6 +2061,9 @@ async def create_job(data: JobPostCreate, request: Request):
         "duration": data.duration,
         "location": data.location,
         "remote": data.remote,
+        "project_size": data.project_size,
+        "experience_level": data.experience_level,
+        "contract_to_hire": data.contract_to_hire,
         "status": "open",
         "applications_count": 0,
         "created_at": datetime.now(timezone.utc).isoformat(),

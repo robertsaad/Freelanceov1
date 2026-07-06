@@ -13,6 +13,8 @@ import FreelancerProfile from "@/pages/FreelancerProfile";
 import Dashboard from "@/pages/Dashboard";
 import EditProfile from "@/pages/EditProfile";
 import FreelancerOnboarding from "@/pages/FreelancerOnboarding";
+import ClientOnboarding from "@/pages/ClientOnboarding";
+import ClientSettings from "@/pages/ClientSettings";
 import Billing from "@/pages/Billing";
 import Statistics from "@/pages/Statistics";
 import AccountHealth from "@/pages/AccountHealth";
@@ -142,6 +144,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/client-onboarding"
+        element={
+          <ProtectedRoute roles={["client"]}>
+            <ClientOnboarding />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
@@ -154,6 +164,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute roles={["freelancer"]}>
             <EditProfile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/company"
+        element={
+          <ProtectedRoute roles={["client"]}>
+            <ClientSettings />
           </ProtectedRoute>
         }
       />
