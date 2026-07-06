@@ -6,6 +6,32 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — Fix job detail blank screen + missing reviews
+
+**Summary:** Clicking a job showed a blank screen (and the browser Back button then
+appeared stuck), and freelancers displayed review counts with no reviews listed. Both
+fixed.
+
+**Fixed**
+- `frontend/src/pages/JobDetail.jsx` — the preview-only branch rendered `<Lock />`
+  icons but `Lock` was never imported from lucide-react. For any non-subscribed/anon
+  viewer the job endpoint returns a `preview_only` payload → that branch rendered →
+  undefined component → React crashed to a blank screen (which also broke Back, since
+  the crashed tree never recovered). Added the missing `Lock` import.
+- `backend/server.py` — `GET /api/freelancers/{id}/reviews` used server-side Cosmos
+  `.sort()` (500 once reviews exist); now sorted in Python.
+
+**Changed**
+- `backend/server.py` `/api/admin/seed-demo` — now creates 3 real review documents per
+  freelancer (from the 3 demo clients) and sets `average_rating`/`total_reviews` to
+  match the seeded reviews, so counts and the reviews list are consistent. Re-running
+  the seed corrects previously seeded profiles. (30 reviews total.)
+
+**Verified (live)** job preview no longer blanks; a freelancer shows rating 5.0 with 3
+matching reviews.
+
+---
+
 ## 2026-07-06 — Demo data seeding + jobs listing fix
 
 **Summary:** Added a secret-gated endpoint to populate the database with realistic
