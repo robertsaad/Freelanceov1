@@ -30,7 +30,17 @@ import {
   GraduationCap,
   Languages as LanguagesIcon,
   X,
+  ImagePlus,
+  Loader2,
+  User as UserIcon,
+  FileText,
 } from "lucide-react";
+import {
+  LANGUAGES,
+  COUNTRIES,
+  getAddressConfig,
+  getPostalError,
+} from "@/lib/locationData";
 
 const EXPERIENCE_LEVELS = [
   { value: "brand_new", label: "I'm brand new to freelancing", desc: "This is my first time offering my skills." },
@@ -70,6 +80,36 @@ const emptyEducation = () => ({
 });
 
 const emptyLanguage = () => ({ language: "", proficiency: "Conversational" });
+
+// Reads an image file and returns a downscaled JPEG data URL (keeps the stored
+// avatar small enough to save directly on the profile document).
+const fileToCompressedDataUrl = (file, maxDim = 400, quality = 0.82) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read the image file."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("That file doesn't look like a valid image."));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 
 // NOTE: These presentational components are defined at module scope (not inside
 // FreelancerOnboarding). Defining them inside the component recreates them on
@@ -145,10 +185,13 @@ export default function FreelancerOnboarding() {
     city: "",
     state: "",
     zip_code: "",
+    profile_photo: "",
   });
 
   const [newSkill, setNewSkill] = useState("");
   const [newSpecialty, setNewSpecialty] = useState("");
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [cvParsing, setCvParsing] = useState(false);
 
   // Redirect non-freelancers, and skip onboarding if a profile already exists.
   useEffect(() => {
@@ -213,6 +256,108 @@ export default function FreelancerOnboarding() {
     update({ languages: data.languages.map((l, idx) => (idx === i ? { ...l, ...patch } : l)) });
   const removeLanguage = (i) => update({ languages: data.languages.filter((_, idx) => idx !== i) });
 
+  // ---- profile photo ----
+  const handlePhotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file (JPG, PNG, etc.).");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image is too large. Please pick one under 10 MB.");
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file);
+      update({ profile_photo: dataUrl });
+    } catch (err) {
+      toast.error(err.message || "Could not process that image.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  // ---- CV autofill ----
+  const matchFromList = (value, list) => {
+    if (!value) return "";
+    const v = String(value).trim().toLowerCase();
+    const aliases = {
+      usa: "United States",
+      "u.s.a.": "United States",
+      "u.s.": "United States",
+      us: "United States",
+      uk: "United Kingdom",
+      "u.k.": "United Kingdom",
+      uae: "United Arab Emirates",
+    };
+    if (aliases[v] && list.includes(aliases[v])) return aliases[v];
+    const hit = list.find((x) => x.toLowerCase() === v);
+    return hit || "";
+  };
+
+  const handleCvUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const okExt = /\.(pdf|docx|doc)$/i.test(file.name);
+    if (!okExt) {
+      toast.error("Please upload a PDF or Word (.docx) file.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File is too large. Please pick one under 10 MB.");
+      return;
+    }
+    setCvParsing(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await axios.post(`${API}/freelancers/parse-cv`, form, {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const p = res.data || {};
+      const matchedCategory = categories.find(
+        (c) => c.toLowerCase() === String(p.category || "").toLowerCase()
+      );
+      setData((d) => ({
+        ...d,
+        title: p.title || d.title,
+        bio: p.bio || d.bio,
+        category: matchedCategory || d.category,
+        skills: p.skills?.length ? p.skills.slice(0, 15) : d.skills,
+        specialties: p.specialties?.length ? p.specialties.slice(0, 3) : d.specialties,
+        languages: p.languages?.length ? p.languages : d.languages,
+        employment_history: p.employment_history?.length ? p.employment_history : d.employment_history,
+        education: p.education?.length ? p.education : d.education,
+        experience_years:
+          p.experience_years != null && p.experience_years !== ""
+            ? String(p.experience_years)
+            : d.experience_years,
+        phone: p.phone || d.phone,
+        country: matchFromList(p.country, COUNTRIES) || d.country,
+        city: p.city || d.city,
+      }));
+      toast.success("We filled in what we could from your CV. Review each step and edit as needed.");
+      setStep(1);
+      window.scrollTo(0, 0);
+    } catch (err) {
+      toast.error(
+        err.response?.data?.detail ||
+          "Couldn't read that CV. You can fill the form manually instead."
+      );
+    } finally {
+      setCvParsing(false);
+    }
+  };
+
+  // ---- country-aware address ----
+  const addressConfig = getAddressConfig(data.country);
+  const postalError = getPostalError(data.country, data.zip_code);
+
   // ---- steps ----
   const steps = [
     "welcome",
@@ -222,6 +367,7 @@ export default function FreelancerOnboarding() {
     "category",
     "skills",
     "title",
+    "photo",
     "employment",
     "education",
     "languages",
@@ -252,6 +398,8 @@ export default function FreelancerOnboarding() {
         return data.bio.trim().length >= 50;
       case "rate":
         return Number(data.hourly_rate) > 0 && data.experience_years !== "";
+      case "personal":
+        return !postalError;
       default:
         return true;
     }
@@ -278,6 +426,8 @@ export default function FreelancerOnboarding() {
         if (!(Number(data.hourly_rate) > 0)) return "Please enter your hourly rate.";
         if (data.experience_years === "") return "Please enter your years of experience.";
         return "Please complete this step to continue.";
+      case "personal":
+        return postalError || "Please complete this step to continue.";
       default:
         return "Please complete this step to continue.";
     }
@@ -322,6 +472,7 @@ export default function FreelancerOnboarding() {
         city: data.city || null,
         state: data.state || null,
         zip_code: data.zip_code || null,
+        profile_photo: data.profile_photo || null,
       };
       await axios.post(`${API}/freelancers/profile`, payload, { withCredentials: true });
       toast.success("Your freelancer profile is live!");
@@ -371,13 +522,59 @@ export default function FreelancerOnboarding() {
               Let's set up your freelancer profile so clients can find you. It only takes a few
               minutes, and you can edit everything later.
             </p>
+
+            <div className="mt-8 rounded-2xl border-2 border-emerald-100 bg-emerald-50/50 p-6 text-left">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                  <FileText className="h-5 w-5" />
+                </span>
+                <div className="flex-1">
+                  <h2 className="font-semibold text-gray-900">Have a CV? Autofill your profile</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Upload your resume (PDF or Word) and we'll pre-fill your title, skills,
+                    experience, education and languages. You review everything before publishing.
+                  </p>
+                  <label className={`mt-4 inline-block ${cvParsing ? "pointer-events-none opacity-70" : "cursor-pointer"}`}>
+                    <input
+                      type="file"
+                      accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="hidden"
+                      onChange={handleCvUpload}
+                      disabled={cvParsing}
+                      data-testid="onboarding-cv-input"
+                    />
+                    <span className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+                      {cvParsing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reading your CV…
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="mr-2 h-4 w-4" /> Upload CV to autofill
+                        </>
+                      )}
+                    </span>
+                  </label>
+                  <p className="mt-2 text-xs text-gray-400">PDF or DOCX, up to 10 MB. Scanned images aren't supported yet.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center gap-3 text-gray-400">
+              <span className="h-px flex-1 bg-gray-200" />
+              <span className="text-xs uppercase tracking-wide">or</span>
+              <span className="h-px flex-1 bg-gray-200" />
+            </div>
+
             <Button
               size="lg"
-              className="mt-8 bg-emerald-600 hover:bg-emerald-700"
+              variant="outline"
+              className="mt-6"
               onClick={next}
+              disabled={cvParsing}
               data-testid="onboarding-start-btn"
             >
-              Get started <ArrowRight className="ml-2 h-4 w-4" />
+              Fill in manually <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
         )}
@@ -553,6 +750,62 @@ export default function FreelancerOnboarding() {
           </StepShell>
         )}
 
+        {stepName === "photo" && (
+          <StepShell
+            eyebrow="Create your profile"
+            heading="Add a profile photo"
+            subheading="A friendly, professional photo helps clients trust you. Optional, but recommended."
+          >
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <div className="h-32 w-32 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+                  {data.profile_photo ? (
+                    <img
+                      src={data.profile_photo}
+                      alt="Profile preview"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <UserIcon className="h-14 w-14 text-gray-300" />
+                  )}
+                </div>
+                {photoUploading && (
+                  <div className="absolute inset-0 rounded-full bg-white/70 flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoChange}
+                    data-testid="onboarding-photo-input"
+                  />
+                  <span className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    <ImagePlus className="mr-2 h-4 w-4" />
+                    {data.profile_photo ? "Change photo" : "Upload photo"}
+                  </span>
+                </label>
+                {data.profile_photo && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-gray-500 hover:text-red-500"
+                    onClick={() => update({ profile_photo: "" })}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" /> Remove
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">JPG or PNG, up to 10 MB.</p>
+            </div>
+          </StepShell>
+        )}
+
         {stepName === "employment" && (
           <StepShell
             eyebrow="Create your profile"
@@ -636,36 +889,54 @@ export default function FreelancerOnboarding() {
             heading="What languages do you speak?"
             subheading="Let clients know how you can communicate."
           >
-            {data.languages.map((l, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600">
-                  <LanguagesIcon className="h-4 w-4" />
-                </span>
-                <Input
-                  className="flex-1"
-                  placeholder="Language"
-                  value={l.language}
-                  onChange={(ev) => setLanguage(i, { language: ev.target.value })}
-                />
-                <Select value={l.proficiency} onValueChange={(v) => setLanguage(i, { proficiency: v })}>
-                  <SelectTrigger className="w-44">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROFICIENCIES.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {data.languages.length > 1 && (
-                  <button type="button" onClick={() => removeLanguage(i)} className="text-gray-400 hover:text-red-500">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ))}
+            {data.languages.map((l, i) => {
+              const taken = data.languages
+                .filter((_, idx) => idx !== i)
+                .map((x) => x.language)
+                .filter(Boolean);
+              const options = LANGUAGES.filter(
+                (lang) => !taken.includes(lang) || lang === l.language
+              );
+              return (
+                <div key={i} className="flex gap-2 items-center">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600">
+                    <LanguagesIcon className="h-4 w-4" />
+                  </span>
+                  <Select
+                    value={l.language || undefined}
+                    onValueChange={(v) => setLanguage(i, { language: v })}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select a language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {options.map((lang) => (
+                        <SelectItem key={lang} value={lang}>
+                          {lang}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={l.proficiency} onValueChange={(v) => setLanguage(i, { proficiency: v })}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROFICIENCIES.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {data.languages.length > 1 && (
+                    <button type="button" onClick={() => removeLanguage(i)} className="text-gray-400 hover:text-red-500">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
             <Button type="button" variant="outline" onClick={addLanguage}>
               <Plus className="mr-2 h-4 w-4" /> Add language
             </Button>
@@ -746,24 +1017,69 @@ export default function FreelancerOnboarding() {
               </div>
               <div className="space-y-2">
                 <Label>Country</Label>
-                <Input value={data.country} onChange={(e) => update({ country: e.target.value })} placeholder="United States" />
+                <Select
+                  value={data.country || undefined}
+                  onValueChange={(v) => update({ country: v, state: "", zip_code: "" })}
+                >
+                  <SelectTrigger data-testid="onboarding-country-select">
+                    <SelectValue placeholder="Select a country" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {COUNTRIES.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <Label>City</Label>
-                <Input value={data.city} onChange={(e) => update({ city: e.target.value })} placeholder="New York" />
+                <Label>{addressConfig.cityLabel}</Label>
+                <Input value={data.city} onChange={(e) => update({ city: e.target.value })} placeholder={addressConfig.cityLabel} />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Street address</Label>
                 <Input value={data.address} onChange={(e) => update({ address: e.target.value })} placeholder="123 Main St" />
               </div>
               <div className="space-y-2">
-                <Label>State / Province</Label>
-                <Input value={data.state} onChange={(e) => update({ state: e.target.value })} placeholder="NY" />
+                <Label>{addressConfig.stateLabel}</Label>
+                {addressConfig.stateOptions ? (
+                  <Select
+                    value={data.state || undefined}
+                    onValueChange={(v) => update({ state: v })}
+                    disabled={!data.country}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={`Select ${addressConfig.stateLabel.toLowerCase()}`} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {addressConfig.stateOptions.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={data.state}
+                    onChange={(e) => update({ state: e.target.value })}
+                    placeholder={addressConfig.stateLabel}
+                  />
+                )}
               </div>
-              <div className="space-y-2">
-                <Label>ZIP / Postal code</Label>
-                <Input value={data.zip_code} onChange={(e) => update({ zip_code: e.target.value })} placeholder="10001" />
-              </div>
+              {addressConfig.postalLabel && (
+                <div className="space-y-2">
+                  <Label>{addressConfig.postalLabel}</Label>
+                  <Input
+                    value={data.zip_code}
+                    onChange={(e) => update({ zip_code: e.target.value })}
+                    placeholder={addressConfig.postalPlaceholder}
+                    className={postalError ? "border-red-400 focus-visible:ring-red-400" : ""}
+                  />
+                  {postalError && <p className="text-xs text-red-500">{postalError}</p>}
+                </div>
+              )}
             </div>
           </StepShell>
         )}
@@ -775,6 +1091,20 @@ export default function FreelancerOnboarding() {
             subheading="Make sure everything looks good. You can edit it later from your dashboard."
           >
             <div className="rounded-xl border bg-white divide-y">
+              <ReviewRow
+                label="Photo"
+                value={
+                  data.profile_photo ? (
+                    <img
+                      src={data.profile_photo}
+                      alt="Profile"
+                      className="h-12 w-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    ""
+                  )
+                }
+              />
               <ReviewRow label="Title" value={data.title} />
               <ReviewRow label="Category" value={data.category} />
               <ReviewRow label="Specialties" value={data.specialties.join(", ")} />

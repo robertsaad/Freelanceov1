@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any
 import uuid
 import re
+import json
 from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
@@ -63,6 +64,38 @@ def _get_blob_service():
             credential=DefaultAzureCredential(),
         )
     return _blob_service_client
+
+# Azure OpenAI / Foundry Config (CV parsing) — authenticated via managed identity
+AZURE_OPENAI_ENDPOINT = os.environ.get('AZURE_OPENAI_ENDPOINT')
+AZURE_OPENAI_DEPLOYMENT = os.environ.get('AZURE_OPENAI_DEPLOYMENT', 'gpt-5.4')
+AZURE_OPENAI_API_VERSION = os.environ.get('AZURE_OPENAI_API_VERSION', '2024-12-01-preview')
+MAX_CV_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_CV_TEXT_CHARS = 20000
+CV_ALLOWED_TYPES = {
+    "application/pdf": "pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/msword": "docx",
+}
+
+_openai_client = None
+
+def _get_openai_client():
+    """Lazily create an AsyncAzureOpenAI client authenticated via managed identity."""
+    global _openai_client
+    if _openai_client is None:
+        if not AZURE_OPENAI_ENDPOINT:
+            raise HTTPException(status_code=503, detail="CV parsing is not configured")
+        from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+        from openai import AsyncAzureOpenAI
+        token_provider = get_bearer_token_provider(
+            DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+        )
+        _openai_client = AsyncAzureOpenAI(
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            azure_ad_token_provider=token_provider,
+            api_version=AZURE_OPENAI_API_VERSION,
+        )
+    return _openai_client
 
 # Subscription Plans (Server-side defined - NEVER accept from frontend)
 SUBSCRIPTION_PLANS = {
@@ -742,6 +775,177 @@ async def serve_media(blob_name: str):
         media_type=(props.content_settings.content_type if props.content_settings else None) or "application/octet-stream",
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+# ==================== CV / RESUME PARSING ====================
+
+CV_SYSTEM_PROMPT = """You extract structured profile data from a freelancer's CV/resume.
+Return ONLY a JSON object (no prose, no markdown) matching EXACTLY this shape:
+{
+  "title": string,               // short professional headline, e.g. "Senior Full-Stack Developer"
+  "bio": string,                 // 2-4 sentence professional summary written in first person
+  "category": string,            // one broad field, e.g. "Software Development", "Design", "Marketing"
+  "skills": [string],            // up to 15 concrete skills/tools
+  "specialties": [string],       // up to 3 focus areas
+  "languages": [{"language": string, "proficiency": "Basic"|"Conversational"|"Fluent"|"Native"}],
+  "employment_history": [{"company": string, "title": string, "start_date": string, "end_date": string, "currently_working": boolean, "description": string}],
+  "education": [{"school": string, "degree": string, "field_of_study": string, "start_year": string, "end_year": string}],
+  "experience_years": number,    // total years of professional experience, integer
+  "phone": string,
+  "country": string,
+  "city": string
+}
+Rules:
+- Use "" for unknown strings, [] for unknown lists, and 0 for unknown numbers.
+- Do NOT invent facts that are not in the CV.
+- Keep dates as they appear in the CV (e.g. "Jan 2021", "2019").
+- currently_working is true only if the role has no end date / says "Present"."""
+
+
+def _extract_cv_text(data: bytes, kind: str) -> str:
+    import io
+    if kind == "pdf":
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(data))
+        return "\n".join((page.extract_text() or "") for page in reader.pages)
+    from docx import Document
+    doc = Document(io.BytesIO(data))
+    parts = [p.text for p in doc.paragraphs]
+    for table in doc.tables:
+        for row in table.rows:
+            parts.append(" ".join(cell.text for cell in row.cells))
+    return "\n".join(parts)
+
+
+def _sanitize_cv(raw: dict) -> dict:
+    def s(v):
+        return v.strip() if isinstance(v, str) else ""
+
+    prof_allowed = {"Basic", "Conversational", "Fluent", "Native"}
+    skills = [s(x) for x in (raw.get("skills") or []) if s(x)][:15]
+    specialties = [s(x) for x in (raw.get("specialties") or []) if s(x)][:3]
+
+    languages = []
+    for l in (raw.get("languages") or [])[:10]:
+        if not isinstance(l, dict):
+            continue
+        lang = s(l.get("language"))
+        if not lang:
+            continue
+        prof = l.get("proficiency")
+        languages.append({"language": lang, "proficiency": prof if prof in prof_allowed else "Conversational"})
+
+    employment = []
+    for e in (raw.get("employment_history") or [])[:15]:
+        if not isinstance(e, dict):
+            continue
+        if not (s(e.get("company")) or s(e.get("title"))):
+            continue
+        employment.append({
+            "company": s(e.get("company")),
+            "title": s(e.get("title")),
+            "start_date": s(e.get("start_date")),
+            "end_date": s(e.get("end_date")),
+            "currently_working": bool(e.get("currently_working")),
+            "description": s(e.get("description")),
+        })
+
+    education = []
+    for e in (raw.get("education") or [])[:15]:
+        if not isinstance(e, dict):
+            continue
+        if not s(e.get("school")):
+            continue
+        education.append({
+            "school": s(e.get("school")),
+            "degree": s(e.get("degree")),
+            "field_of_study": s(e.get("field_of_study")),
+            "start_year": s(e.get("start_year")),
+            "end_year": s(e.get("end_year")),
+        })
+
+    try:
+        yrs_val = raw.get("experience_years")
+        experience_years = int(float(yrs_val)) if yrs_val not in (None, "") else None
+        if experience_years is not None and (experience_years < 0 or experience_years > 70):
+            experience_years = None
+    except (TypeError, ValueError):
+        experience_years = None
+
+    return {
+        "title": s(raw.get("title")),
+        "bio": s(raw.get("bio")),
+        "category": s(raw.get("category")),
+        "skills": skills,
+        "specialties": specialties,
+        "languages": languages,
+        "employment_history": employment,
+        "education": education,
+        "experience_years": experience_years,
+        "phone": s(raw.get("phone")),
+        "country": s(raw.get("country")),
+        "city": s(raw.get("city")),
+    }
+
+
+async def _parse_cv_with_llm(text: str) -> dict:
+    client = _get_openai_client()
+    try:
+        resp = await client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT,
+            messages=[
+                {"role": "system", "content": CV_SYSTEM_PROMPT},
+                {"role": "user", "content": f"CV text:\n\n{text}"},
+            ],
+            response_format={"type": "json_object"},
+            max_completion_tokens=4000,
+        )
+    except Exception:
+        logger.exception("CV LLM call failed")
+        raise HTTPException(status_code=502, detail="The CV parser is temporarily unavailable. Please fill the form manually.")
+
+    content = (resp.choices[0].message.content or "").strip() if resp.choices else ""
+    try:
+        raw = json.loads(content)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=502, detail="Could not understand the CV. Please fill the form manually.")
+    if not isinstance(raw, dict):
+        raise HTTPException(status_code=502, detail="Could not understand the CV. Please fill the form manually.")
+    return _sanitize_cv(raw)
+
+
+@api_router.post("/freelancers/parse-cv")
+async def parse_cv(request: Request, file: UploadFile = File(...)):
+    """Extract structured profile fields from an uploaded CV (PDF or DOCX)."""
+    user = await require_auth(request)
+    if user["role"] != "freelancer":
+        raise HTTPException(status_code=403, detail="Only freelancers can parse CVs")
+
+    content_type = (file.content_type or "").lower()
+    kind = CV_ALLOWED_TYPES.get(content_type)
+    if not kind:
+        ext = os.path.splitext(file.filename or "")[1].lower()
+        kind = {".pdf": "pdf", ".docx": "docx", ".doc": "docx"}.get(ext)
+    if not kind:
+        raise HTTPException(status_code=400, detail="Please upload a PDF or Word (.docx) file.")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(data) > MAX_CV_BYTES:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 10 MB.")
+
+    try:
+        text = _extract_cv_text(data, kind)
+    except Exception:
+        logger.exception("CV text extraction failed")
+        raise HTTPException(status_code=422, detail="Could not read that file. If it is a scanned image, please fill the form manually.")
+
+    text = (text or "").strip()
+    if len(text) < 30:
+        raise HTTPException(status_code=422, detail="We couldn't find readable text in that CV. If it is a scanned image, please fill the form manually.")
+    text = text[:MAX_CV_TEXT_CHARS]
+
+    return await _parse_cv_with_llm(text)
 
 @api_router.get("/account-health/me")
 async def get_account_health(request: Request):

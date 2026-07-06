@@ -6,6 +6,69 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-06 — CV autofill: parse resume to pre-fill the onboarding profile
+
+**Summary:** Freelancers can now upload a CV (PDF or Word) on the first onboarding
+step and have their profile auto-filled — title, bio, category, skills, specialties,
+work experience, education, languages, years of experience, phone, country, city.
+Parsing uses the existing Foundry `gpt-5.4` deployment via managed identity. Users
+still review and edit every step before publishing; "Fill in manually" remains.
+
+**Added**
+- `backend/server.py` — `POST /api/freelancers/parse-cv`: validates file (PDF/DOCX,
+  ≤10 MB), extracts text (`pypdf` / `python-docx`), calls Foundry with a strict JSON
+  schema prompt (`AsyncAzureOpenAI` + managed-identity token), sanitizes/validates the
+  model output, and returns structured profile fields. Graceful errors fall back to
+  manual entry (scanned-image CVs are not supported yet).
+- `backend/requirements.txt` — `pypdf`, `python-docx`.
+- `frontend/src/pages/FreelancerOnboarding.jsx` — welcome step now offers "Upload CV to
+  autofill" vs "Fill in manually"; parsed data is merged into the wizard (category is
+  matched to the allowed list, country matched/aliased to the dropdown) and the user is
+  dropped into step 1 to review.
+
+**Infra (Azure, applied directly)**
+- App setting `AZURE_OPENAI_ENDPOINT` = `https://freenlaceo-ai.cognitiveservices.azure.com/`,
+  `AZURE_OPENAI_DEPLOYMENT` = `gpt-5.4`, `AZURE_OPENAI_API_VERSION` = `2024-12-01-preview`.
+- App Service managed identity granted **Cognitive Services OpenAI User** on the
+  `Freenlaceo-AI` Foundry account.
+
+**Notes**
+- No secrets in config — auth is managed identity end-to-end.
+- Verified frontend build; backend endpoint verified post-deploy.
+
+---
+
+## 2026-07-06 — Onboarding: language/country dropdowns, country-aware address, photo upload
+
+**Summary:** Enhanced the freelancer onboarding wizard with structured, guided inputs:
+languages and countries are now dropdowns; the address fields adapt to the selected
+country (field labels + postal-code format/validation change per country, and
+countries without postal codes hide that field); and a new step lets the freelancer
+upload a profile photo.
+
+**Added**
+- `frontend/src/lib/locationData.js` — `LANGUAGES`, `COUNTRIES`, US states/CA provinces,
+  per-country address config (`getAddressConfig`) and postal-code validation
+  (`getPostalError`).
+- New "photo" onboarding step: image picker with live preview, client-side downscale
+  to a compact JPEG data URL stored in `profile_photo` (no blob storage dependency),
+  remove/change controls. Shown in the review step.
+
+**Changed**
+- `frontend/src/pages/FreelancerOnboarding.jsx`
+  - Languages step: free-text input → dropdown (excludes already-picked languages).
+  - Personal step: Country is a dropdown; City/State labels and the postal field
+    (label, placeholder, validation) are driven by the chosen country; US/Canada/etc.
+    show a state/province dropdown; postal code is validated and blocks "Next" if
+    invalid. Changing country resets state + postal.
+  - Submit payload now includes `profile_photo`.
+
+**Notes**
+- Backend already supported `profile_photo` and all address fields — no backend change.
+- Verified production build compiles (`yarn build`, +3.18 kB gzip).
+
+---
+
 ## 2026-07-06 — Fix freelancer onboarding inputs losing focus after one character
 
 **Summary:** In the freelancer onboarding wizard ("Create your profile"), typing in
