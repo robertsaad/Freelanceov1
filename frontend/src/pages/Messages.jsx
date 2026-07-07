@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth, API } from "@/App";
 import Navbar from "@/components/Navbar";
@@ -7,9 +7,11 @@ import MobileNav from "@/components/MobileNav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Send, MessageSquare, Search, ArrowLeft } from "lucide-react";
+import { Send, MessageSquare, Search, ArrowLeft, Briefcase, ExternalLink } from "lucide-react";
 
 export default function Messages() {
   const { user } = useAuth();
@@ -22,6 +24,12 @@ export default function Messages() {
   const [searchQuery, setSearchQuery] = useState("");
   const messagesEndRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  // @job mention: details dialog + composer autocomplete
+  const [jobCard, setJobCard] = useState(null);
+  const [jobCardOpen, setJobCardOpen] = useState(false);
+  const [suggest, setSuggest] = useState([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
 
   useEffect(() => {
     fetchConversations();
@@ -113,6 +121,68 @@ export default function Messages() {
   const getInitials = (name) => {
     if (!name) return "U";
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  };
+
+  // --- @job mentions -------------------------------------------------------
+  const openJobCard = async (num) => {
+    try {
+      const r = await axios.get(`${API}/jobs/ref/${num}`, { withCredentials: true });
+      setJobCard(r.data);
+      setJobCardOpen(true);
+    } catch (e) {
+      toast.error(`Job #${num} not found`);
+    }
+  };
+
+  const fetchSuggest = async (q) => {
+    try {
+      const r = await axios.get(`${API}/jobs/mention-search?q=${encodeURIComponent(q)}`, { withCredentials: true });
+      const list = r.data || [];
+      setSuggest(list);
+      setSuggestOpen(list.length > 0);
+    } catch (e) {
+      setSuggest([]);
+      setSuggestOpen(false);
+    }
+  };
+
+  const onComposerChange = (val) => {
+    setNewMessage(val);
+    const m = /@(\w*)$/.exec(val);
+    if (m) {
+      fetchSuggest(m[1]);
+    } else {
+      setSuggestOpen(false);
+      setSuggest([]);
+    }
+  };
+
+  const pickMention = (job) => {
+    setNewMessage((prev) => prev.replace(/@(\w*)$/, `@job${job.job_number} `));
+    setSuggestOpen(false);
+    setSuggest([]);
+  };
+
+  const renderContent = (text, isSent) => {
+    const parts = String(text || "").split(/(@job\d+)/gi);
+    return parts.map((part, i) => {
+      const m = /^@job(\d+)$/i.exec(part);
+      if (m) {
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => openJobCard(m[1])}
+            className={`font-semibold underline decoration-dotted underline-offset-2 ${
+              isSent ? "text-white hover:text-cyan-100" : "text-cyan-700 hover:text-cyan-900"
+            }`}
+          >
+            {part}
+          </button>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
   };
 
   const filteredConversations = conversations.filter(conv =>
@@ -228,7 +298,7 @@ export default function Messages() {
                                 : "message-received rounded-bl-md"
                             }`}
                           >
-                            <p>{msg.content}</p>
+                            <p className="whitespace-pre-wrap break-words">{renderContent(msg.content, msg.sender_id === user?.id)}</p>
                             <p className={`text-xs mt-1 ${msg.sender_id === user?.id ? "text-cyan-100" : "text-gray-400"}`}>
                               {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </p>
@@ -240,11 +310,28 @@ export default function Messages() {
                   </ScrollArea>
 
                   {/* Message Input */}
-                  <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
+                  <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2 relative">
+                    {suggestOpen && suggest.length > 0 && (
+                      <div className="absolute bottom-full left-4 right-4 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden z-20">
+                        <div className="px-3 py-2 text-xs text-gray-400 border-b">Tag a job</div>
+                        {suggest.map((j) => (
+                          <button
+                            key={j.id}
+                            type="button"
+                            onClick={() => pickMention(j)}
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2"
+                          >
+                            <Briefcase className="h-4 w-4 text-cyan-600 flex-shrink-0" />
+                            <span className="font-medium text-gray-700">@job{j.job_number}</span>
+                            <span className="text-gray-500 truncate">{j.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     <Input
-                      placeholder="Type a message..."
+                      placeholder="Type a message... (type @ to tag a job)"
                       value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
+                      onChange={(e) => onComposerChange(e.target.value)}
                       className="flex-1"
                       data-testid="message-input"
                     />
@@ -268,6 +355,61 @@ export default function Messages() {
       </div>
 
       <MobileNav />
+
+      {/* Job mention details */}
+      <Dialog open={jobCardOpen} onOpenChange={setJobCardOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-cyan-600" />
+              {jobCard ? `@job${jobCard.job_number}` : "Job"}
+            </DialogTitle>
+          </DialogHeader>
+          {jobCard && (
+            <div className="space-y-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{jobCard.title}</h3>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge className={jobCard.status === "open" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"}>
+                    {jobCard.status}
+                  </Badge>
+                  {jobCard.category && <Badge variant="secondary">{jobCard.category}</Badge>}
+                  {jobCard.remote && <Badge className="bg-blue-100 text-blue-700">Remote</Badge>}
+                </div>
+              </div>
+              <div className="text-sm text-gray-600 space-y-1">
+                {(jobCard.budget_min || jobCard.budget_max) && (
+                  <p>
+                    <span className="font-medium text-gray-800">Budget:</span>{" "}
+                    {jobCard.budget_min ? `$${Number(jobCard.budget_min).toLocaleString()}` : ""}
+                    {jobCard.budget_min && jobCard.budget_max ? " - " : ""}
+                    {jobCard.budget_max ? `$${Number(jobCard.budget_max).toLocaleString()}` : ""}
+                    {jobCard.budget_type ? ` (${jobCard.budget_type})` : ""}
+                  </p>
+                )}
+                {jobCard.client_name && (
+                  <p><span className="font-medium text-gray-800">Client:</span> {jobCard.client_name}</p>
+                )}
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  className="bg-cyan-600 hover:bg-cyan-700"
+                  onClick={() => {
+                    setJobCardOpen(false);
+                    navigate(`/jobs/${jobCard.id}`);
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open full job
+                </Button>
+                <Button variant="outline" onClick={() => setJobCardOpen(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

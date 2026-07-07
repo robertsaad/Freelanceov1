@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import ReturnDocument
 import os
 import logging
 from pathlib import Path
@@ -2354,16 +2355,28 @@ async def mark_all_notifications_read(request: Request):
 
 # ==================== JOB POSTINGS ENDPOINTS ====================
 
+async def _next_job_number() -> int:
+    """Atomically get the next sequential, human-friendly job number."""
+    doc = await db.counters.find_one_and_update(
+        {"_id": "job_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return int(doc["seq"])
+
+
 @api_router.post("/jobs")
 async def create_job(data: JobPostCreate, request: Request):
     """Create a new job posting (clients only)"""
     user = await require_auth(request)
-    
+
     if user["role"] != "client":
         raise HTTPException(status_code=403, detail="Only clients can post jobs")
-    
+
     job = {
         "id": str(uuid.uuid4()),
+        "job_number": await _next_job_number(),
         "client_id": user["id"],
         "title": data.title,
         "description": data.description,
@@ -2546,6 +2559,56 @@ async def get_job_categories():
     ]
     results = await db.jobs.aggregate(pipeline).to_list(100)
     return [{"name": r["_id"], "count": r["count"]} for r in results if r["_id"]]
+
+@api_router.get("/jobs/mention-search")
+async def mention_search_jobs(request: Request, q: Optional[str] = None):
+    """Autocomplete for @job mentions in chat. Matches by job number or title.
+    Returns open jobs plus the current user's own jobs."""
+    user = await require_auth(request)
+    query: Dict[str, Any] = {}
+    ors = [{"status": "open"}, {"client_id": user["id"]}]
+    query["$or"] = ors
+
+    jobs = await db.jobs.find(query, {"_id": 0, "id": 1, "job_number": 1, "title": 1, "status": 1}).to_list(500)
+
+    if q:
+        ql = q.strip().lower().lstrip("@")
+        # allow "job12" or "12" or a title fragment
+        num = None
+        m = re.search(r"(\d+)", ql)
+        if m:
+            num = int(m.group(1))
+        jobs = [
+            j for j in jobs
+            if (num is not None and j.get("job_number") == num)
+            or (ql and ql in (j.get("title") or "").lower())
+        ]
+
+    jobs.sort(key=lambda j: j.get("job_number") or 0, reverse=True)
+    return jobs[:8]
+
+
+@api_router.get("/jobs/ref/{job_number}")
+async def get_job_by_number(job_number: int, request: Request):
+    """Lightweight job card for a @job mention chip (any authenticated user)."""
+    await require_auth(request)
+    job = await db.jobs.find_one({"job_number": job_number}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "name": 1})
+    return {
+        "id": job["id"],
+        "job_number": job.get("job_number"),
+        "title": job.get("title"),
+        "status": job.get("status"),
+        "category": job.get("category"),
+        "budget_min": job.get("budget_min"),
+        "budget_max": job.get("budget_max"),
+        "budget_type": job.get("budget_type"),
+        "remote": job.get("remote"),
+        "client_name": client.get("name") if client else None,
+    }
+
 
 @api_router.get("/jobs/{job_id}")
 async def get_job(job_id: str, request: Request):
@@ -3680,6 +3743,37 @@ async def _local_auto_seed():
         logger.info("Local auto-seed complete: demo data + admin freelanceo@freelanceo.com / rorotest")
     except Exception:
         logger.exception("Local auto-seed failed")
+
+
+@app.on_event("startup")
+async def _ensure_job_numbers():
+    """Backfill sequential job_number on any jobs missing it and sync the counter.
+    Idempotent — safe to run on every startup (prod + local)."""
+    try:
+        existing = await db.jobs.find(
+            {"job_number": {"$exists": True}}, {"_id": 0, "job_number": 1}
+        ).to_list(100000)
+        max_num = max([e.get("job_number") or 0 for e in existing], default=0)
+
+        missing = await db.jobs.find(
+            {"job_number": {"$exists": False}}, {"_id": 0, "id": 1, "created_at": 1}
+        ).to_list(100000)
+        missing.sort(key=lambda j: j.get("created_at") or "")
+        n = max_num
+        for j in missing:
+            n += 1
+            await db.jobs.update_one({"id": j["id"]}, {"$set": {"job_number": n}})
+
+        counter = await db.counters.find_one({"_id": "job_number"})
+        cur_seq = (counter or {}).get("seq", 0)
+        if n > cur_seq:
+            await db.counters.update_one(
+                {"_id": "job_number"}, {"$set": {"seq": n}}, upsert=True
+            )
+        if missing:
+            logger.info("Backfilled job_number for %d job(s)", len(missing))
+    except Exception:
+        logger.exception("job_number backfill failed")
 
 
 @app.on_event("shutdown")

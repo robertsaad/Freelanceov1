@@ -6,6 +6,31 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-07 — Job numbers + @job mentions in chat
+
+**Summary:** Every job now has a short human-friendly number (e.g. `#9`), and in chat you
+can tag a job with `@job9`. Typing `@` shows a job picker; the tag renders as a clickable
+chip that opens a small job-details dialog (with "Open full job").
+
+**Added / Changed — `backend/server.py`**
+- Jobs get a sequential `job_number` (atomic counter in a `counters` collection). New
+  jobs get one on creation; a startup migration **backfills** existing jobs and syncs the
+  counter (idempotent, runs on prod + local).
+- `GET /api/jobs/mention-search?q=` — autocomplete for `@job` tags (matches by number or
+  title; returns open jobs + the caller's own jobs). Placed before `/jobs/{job_id}`.
+- `GET /api/jobs/ref/{job_number}` — lightweight job card for the mention chip dialog.
+
+**Added / Changed — `frontend/src/pages/Messages.jsx`**
+- Composer: typing `@` (optionally `@` + text/number) shows a job picker; selecting inserts
+  `@job<number>`.
+- Message bubbles: `@job<number>` renders as a clickable chip → opens a job-details dialog
+  (title, status, budget, client) with **Open full job**.
+
+**Tested (local)** New job → `job_number` assigned; existing jobs backfilled (1, 2, 7…);
+mention-search by title and by number; ref lookup returns the card. Frontend compiles clean.
+
+---
+
 ## 2026-07-07 — Live message updates (polling)
 
 **Summary:** Messages now appear without a manual refresh. While a conversation is open the
