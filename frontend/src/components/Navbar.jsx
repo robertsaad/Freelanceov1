@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import NotificationBell from "@/components/NotificationBell";
 import { 
   Menu, X, User, LayoutDashboard, MessageSquare, FileText, LogOut, 
   ChevronDown, Briefcase, Search, Users, Code, Palette, PenTool, 
@@ -226,7 +227,9 @@ export default function Navbar() {
           {/* Right Side - User Menu */}
           <div className="hidden md:flex items-center gap-3">
             {user ? (
-              <DropdownMenu>
+              <>
+                <NotificationBell />
+                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2" data-testid="user-menu-trigger">
                     <Avatar className="h-8 w-8">
@@ -340,6 +343,7 @@ export default function Navbar() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             ) : (
               <div className="flex items-center gap-3">
                 <Button variant="ghost" asChild data-testid="login-btn">
@@ -353,7 +357,8 @@ export default function Navbar() {
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center gap-1">
+            {user && <NotificationBell />}
             <Button
               variant="ghost"
               size="icon"

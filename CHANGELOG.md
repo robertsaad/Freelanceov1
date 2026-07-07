@@ -6,6 +6,33 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-07 — Notification bell + more notification triggers
+
+**Summary:** Added a notification **bell** in the navbar (desktop + mobile) with a live
+unread badge, a dropdown of recent notifications, click-to-open (marks read + navigates),
+and "Mark all read". Added notifications for **new follower** and **post like**, and fixed
+two endpoints that returned HTTP 500 (same Mongo `_id` bug as messaging).
+
+**Added — frontend**
+- `components/NotificationBell.jsx` — bell + red unread badge, polls unread count every
+  45s, dropdown lists recent notifications, per-item mark-read + navigate, mark-all-read,
+  "View all" → `/notifications`.
+- `components/Navbar.jsx` — renders the bell for logged-in users (desktop and mobile).
+
+**Fixed / Added — `backend/server.py`**
+- `POST /freelancers/{id}/follow` now notifies the freelancer (new follower).
+- `POST /posts/{id}/like` now notifies the post author.
+- Fixed 500s: `POST /freelancers/{id}/reviews` and `POST /hiring-requests` used
+  `return {"_id": 0, **doc}` where `insert_one` had injected an `ObjectId` — now pop `_id`.
+  (Reviews also now notify the freelancer.)
+- Existing notification triggers confirmed: job application, application shortlist/decline,
+  hire, new message, hiring request, contract created, contract terms, milestone updates.
+
+**Tested (local, mock DB)** apply → client +1; follow → freelancer +1; hiring request
+(no 500) → freelancer +1; unread-count and mark-all-read work; dropdown lists types.
+
+---
+
 ## 2026-07-07 — My Applications (freelancer) & My Jobs (client) pages + progress
 
 **Summary:** Dedicated tracking pages. Freelancers get a **My Applications** page with a

@@ -1197,8 +1197,16 @@ async def create_review(freelancer_id: str, data: ReviewCreate, request: Request
                 "total_reviews": result[0]["count"]
             }}
         )
-    
-    return {"_id": 0, **review}
+
+    # Notify the freelancer of the new review
+    freelancer_profile = await db.freelancer_profiles.find_one({"id": freelancer_id})
+    if freelancer_profile:
+        await _notify(freelancer_profile.get("user_id"), "review", "New review",
+                      f"{user['name']} left you a {data.rating}-star review.",
+                      f"/freelancers/{freelancer_id}")
+
+    review.pop("_id", None)
+    return review
 
 # ==================== MESSAGES ENDPOINTS ====================
 
@@ -1376,7 +1384,8 @@ async def create_hiring_request(data: HiringRequestCreate, request: Request):
         }
         await db.notifications.insert_one(notification)
     
-    return {"_id": 0, **hiring_request}
+    hiring_request.pop("_id", None)
+    return hiring_request
 
 @api_router.put("/hiring-requests/{request_id}")
 async def update_hiring_request(request_id: str, data: HiringRequestUpdate, request: Request):
@@ -2045,6 +2054,8 @@ async def follow_freelancer(freelancer_id: str, request: Request):
     }
     
     await db.follows.insert_one(follow)
+    await _notify(freelancer.get("user_id"), "follow", "New follower",
+                  f"{user['name']} started following you.", "/feed")
     return {"message": "Following successfully"}
 
 @api_router.delete("/freelancers/{freelancer_id}/follow")
@@ -2263,6 +2274,10 @@ async def like_post(post_id: str, request: Request):
         }
         await db.post_likes.insert_one(like)
         await db.posts.update_one({"id": post_id}, {"$inc": {"likes_count": 1}})
+        post = await db.posts.find_one({"id": post_id})
+        if post and post.get("user_id") and post["user_id"] != user["id"]:
+            await _notify(post["user_id"], "like", "New like",
+                          f"{user['name']} liked your post.", "/feed")
         return {"liked": True}
 
 @api_router.get("/posts/{post_id}/is-liked")
