@@ -65,3 +65,6 @@ yarn.lock
 # Environment files
 *.env
 *.env.*
+
+# Office temp/lock files
+~$*
