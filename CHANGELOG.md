@@ -6,6 +6,29 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-07 — Message opens the right chat + applicant filters
+
+**Summary:** Clicking "Message" on an applicant now opens a conversation with that person
+directly (instead of the empty Messages page), and the applicant list can be filtered by
+status.
+
+**Fixed / Added — frontend**
+- `pages/Messages.jsx` — supports a deep link `/dashboard/messages?userId=..&name=..&picture=..`;
+  on load it opens (or starts) the chat with that user, then clears the query params.
+- `pages/JobDetail.jsx` — the applicant **Message** button now deep-links to that
+  freelancer's chat. Added **status filters** (All / Applied / Shortlisted / Hired /
+  Declined) with per-status counts above the applicant list.
+
+**Note (engineering):** avoid nested parenthesised ternaries in JSX — CRA's Flow parser
+rejects them (`Unexpected token, expected ","`); use `&&` conditionals. Also don't add an
+`eslint-disable` for a rule the config doesn't load (`react-hooks/exhaustive-deps`) — it
+errors the build.
+
+**Tested (local)** Frontend compiles clean; deep-link builds the conversation from the
+applicant's user id; filters slice the list by status.
+
+---
+
 ## 2026-07-07 — Notification bell + more notification triggers
 
 **Summary:** Added a notification **bell** in the navbar (desktop + mobile) with a live

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useAuth, API } from "@/App";
 import Navbar from "@/components/Navbar";
@@ -20,9 +21,24 @@ export default function Messages() {
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const messagesEndRef = useRef(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     fetchConversations();
+  }, []);
+
+  // Deep-link: /dashboard/messages?userId=..&name=..&picture=.. opens that chat directly
+  useEffect(() => {
+    const uid = searchParams.get("userId");
+    if (uid) {
+      setSelectedUser({
+        id: uid,
+        name: searchParams.get("name") || "User",
+        picture: searchParams.get("picture") || null,
+      });
+      // clear params so refresh/back doesn't re-trigger
+      setSearchParams({}, { replace: true });
+    }
   }, []);
 
   useEffect(() => {

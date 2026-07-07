@@ -38,6 +38,7 @@ export default function JobDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const [applications, setApplications] = useState([]);
+  const [appFilter, setAppFilter] = useState("all");
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applyForm, setApplyForm] = useState({
     cover_letter: "",
@@ -230,6 +231,23 @@ export default function JobDetail() {
 
   const isOwner = user?.id === job.client_id;
   const isPreviewOnly = job.preview_only;
+
+  // Applicant filtering (owner view)
+  const APP_FILTERS = [
+    { key: "all", label: "All" },
+    { key: "pending", label: "Applied" },
+    { key: "shortlisted", label: "Shortlisted" },
+    { key: "hired", label: "Hired" },
+    { key: "declined", label: "Declined" },
+  ];
+  const appStatusOf = (a) => a.status || "pending";
+  const appCounts = applications.reduce((acc, a) => {
+    const s = appStatusOf(a);
+    acc[s] = (acc[s] || 0) + 1;
+    return acc;
+  }, {});
+  const filteredApplications =
+    appFilter === "all" ? applications : applications.filter((a) => appStatusOf(a) === appFilter);
 
   // Show subscription prompt for preview-only access
   if (isPreviewOnly) {
@@ -529,11 +547,37 @@ export default function JobDetail() {
           <Card data-testid="applications-section">
             <CardHeader>
               <CardTitle>Applications ({applications.length})</CardTitle>
+              {applications.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {APP_FILTERS.map((f) => {
+                    const count = f.key === "all" ? applications.length : appCounts[f.key] || 0;
+                    return (
+                      <Button
+                        key={f.key}
+                        type="button"
+                        size="sm"
+                        variant={appFilter === f.key ? "default" : "outline"}
+                        className={appFilter === f.key ? "bg-indigo-600 hover:bg-indigo-700" : ""}
+                        onClick={() => setAppFilter(f.key)}
+                        data-testid={`filter-${f.key}`}
+                      >
+                        {f.label} ({count})
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
             </CardHeader>
             <CardContent>
-              {applications.length > 0 ? (
+              {applications.length === 0 && (
+                <p className="text-gray-500 text-center py-8">No applications yet</p>
+              )}
+              {applications.length > 0 && filteredApplications.length === 0 && (
+                <p className="text-gray-500 text-center py-8">No {appFilter} applicants</p>
+              )}
+              {filteredApplications.length > 0 && (
                 <div className="space-y-4">
-                  {applications.map((app) => (
+                  {filteredApplications.map((app) => (
                     <div key={app.id} className="border rounded-lg p-4">
                       <div className="flex items-start gap-4">
                         <Avatar className="h-12 w-12">
@@ -619,7 +663,7 @@ export default function JobDetail() {
                               variant="outline"
                               asChild
                             >
-                              <Link to={`/dashboard/messages`}>
+                              <Link to={`/dashboard/messages?userId=${app.freelancer?.id}&name=${encodeURIComponent(app.freelancer?.name || "")}${app.freelancer?.picture ? `&picture=${encodeURIComponent(app.freelancer.picture)}` : ""}`}>
                                 <MessageSquare className="h-3 w-3 mr-1" />
                                 Message
                               </Link>
@@ -667,8 +711,6 @@ export default function JobDetail() {
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p className="text-gray-500 text-center py-8">No applications yet</p>
               )}
             </CardContent>
           </Card>
