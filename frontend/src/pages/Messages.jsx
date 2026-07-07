@@ -25,6 +25,9 @@ export default function Messages() {
 
   useEffect(() => {
     fetchConversations();
+    // Poll the conversation list so new incoming chats / unread counts appear live
+    const t = setInterval(fetchConversations, 8000);
+    return () => clearInterval(t);
   }, []);
 
   // Deep-link: /dashboard/messages?userId=..&name=..&picture=.. opens that chat directly
@@ -42,9 +45,11 @@ export default function Messages() {
   }, []);
 
   useEffect(() => {
-    if (selectedUser) {
-      fetchMessages(selectedUser.id);
-    }
+    if (!selectedUser) return;
+    fetchMessages(selectedUser.id);
+    // Poll the open thread so new messages appear without a manual refresh
+    const t = setInterval(() => fetchMessages(selectedUser.id, true), 4000);
+    return () => clearInterval(t);
   }, [selectedUser]);
 
   useEffect(() => {
@@ -66,12 +71,21 @@ export default function Messages() {
     }
   };
 
-  const fetchMessages = async (userId) => {
+  const fetchMessages = async (userId, silent = false) => {
     try {
       const response = await axios.get(`${API}/messages/${userId}`, { withCredentials: true });
-      setMessages(response.data);
+      const next = response.data || [];
+      setMessages((prev) => {
+        // Skip the state update when nothing changed, so polling doesn't jump the scroll
+        const last = prev[prev.length - 1];
+        const nextLast = next[next.length - 1];
+        if (silent && prev.length === next.length && last?.id === nextLast?.id) {
+          return prev;
+        }
+        return next;
+      });
     } catch (error) {
-      console.error("Error fetching messages:", error);
+      if (!silent) console.error("Error fetching messages:", error);
     }
   };
 

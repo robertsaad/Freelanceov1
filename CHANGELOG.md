@@ -6,6 +6,24 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-07 — Live message updates (polling)
+
+**Summary:** Messages now appear without a manual refresh. While a conversation is open the
+thread is re-fetched every 4s, and the conversation list refreshes every 8s, so incoming
+messages and new chats show up automatically.
+
+**Changed — `frontend/src/pages/Messages.jsx`**
+- Poll the open thread every 4s (silent) and the conversation list every 8s; intervals are
+  cleared on unmount / when switching conversations.
+- `fetchMessages` now skips the state update when nothing changed (compares length + last
+  message id), so polling doesn't yank the scroll position.
+
+**Note:** this is a lightweight polling approach (same pattern as the notification bell).
+A future upgrade to true real-time would use WebSockets/SSE (requires enabling WebSockets
+on the App Service + a FastAPI socket endpoint).
+
+---
+
 ## 2026-07-07 — Message opens the right chat + applicant filters
 
 **Summary:** Clicking "Message" on an applicant now opens a conversation with that person
