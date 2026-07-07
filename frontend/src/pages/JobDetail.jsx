@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
@@ -37,6 +38,13 @@ export default function JobDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [hasApplied, setHasApplied] = useState(false);
   const [applications, setApplications] = useState([]);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applyForm, setApplyForm] = useState({
+    cover_letter: "",
+    proposed_rate: "",
+    proposed_rate_type: "fixed",
+    estimated_duration: "",
+  });
 
   useEffect(() => {
     fetchJob();
@@ -93,7 +101,8 @@ export default function JobDetail() {
     }
   };
 
-  const handleApply = async () => {
+  const handleApply = async (e) => {
+    if (e) e.preventDefault();
     if (!user) {
       toast.error("Please login to apply");
       navigate("/login");
@@ -102,13 +111,47 @@ export default function JobDetail() {
 
     setSubmitting(true);
     try {
-      await axios.post(`${API}/jobs/${id}/apply`, {}, { withCredentials: true });
+      await axios.post(
+        `${API}/jobs/${id}/apply`,
+        {
+          cover_letter: applyForm.cover_letter,
+          proposed_rate: applyForm.proposed_rate ? Number(applyForm.proposed_rate) : null,
+          proposed_rate_type: applyForm.proposed_rate_type,
+          estimated_duration: applyForm.estimated_duration,
+        },
+        { withCredentials: true }
+      );
       toast.success("Application submitted! The client will be notified.");
       setHasApplied(true);
+      setShowApplyModal(false);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Failed to apply");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const hireApplicant = async (appId) => {
+    try {
+      const res = await axios.post(
+        `${API}/jobs/${id}/applications/${appId}/hire`,
+        {},
+        { withCredentials: true }
+      );
+      toast.success("Hired! Set up terms & milestones on the contract.");
+      navigate(`/dashboard/contracts/${res.data.contract_id}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to hire");
+    }
+  };
+
+  const updateApplication = async (appId, status) => {
+    try {
+      await axios.put(`${API}/applications/${appId}`, { status }, { withCredentials: true });
+      toast.success(`Applicant ${status}`);
+      fetchApplications();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to update");
     }
   };
 
@@ -358,15 +401,81 @@ export default function JobDetail() {
                     Applied
                   </Button>
                 ) : (
-                  <Button 
-                    className="bg-indigo-600 hover:bg-indigo-700"
-                    onClick={handleApply}
-                    disabled={submitting}
-                    data-testid="apply-btn"
-                  >
-                    <Briefcase className="h-4 w-4 mr-2" />
-                    {submitting ? "Applying..." : "Apply Now"}
-                  </Button>
+                  <Dialog open={showApplyModal} onOpenChange={setShowApplyModal}>
+                    <DialogTrigger asChild>
+                      <Button
+                        className="bg-indigo-600 hover:bg-indigo-700"
+                        data-testid="apply-btn"
+                      >
+                        <Briefcase className="h-4 w-4 mr-2" />
+                        Apply Now
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Submit a proposal</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleApply} className="space-y-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Cover letter</label>
+                          <Textarea
+                            value={applyForm.cover_letter}
+                            onChange={(e) => setApplyForm({ ...applyForm, cover_letter: e.target.value })}
+                            rows={5}
+                            placeholder="Introduce yourself and explain why you're a great fit for this job..."
+                            data-testid="cover-letter-input"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Your rate (USD)</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={applyForm.proposed_rate}
+                              onChange={(e) => setApplyForm({ ...applyForm, proposed_rate: e.target.value })}
+                              placeholder="e.g. 1500"
+                              data-testid="proposed-rate-input"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-sm font-medium text-gray-700">Rate type</label>
+                            <div className="flex gap-2 mt-1">
+                              {["fixed", "hourly"].map((rt) => (
+                                <Button
+                                  key={rt}
+                                  type="button"
+                                  variant={applyForm.proposed_rate_type === rt ? "default" : "outline"}
+                                  className={applyForm.proposed_rate_type === rt ? "bg-indigo-600 flex-1" : "flex-1"}
+                                  onClick={() => setApplyForm({ ...applyForm, proposed_rate_type: rt })}
+                                >
+                                  {rt === "fixed" ? "Fixed" : "Hourly"}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Estimated duration</label>
+                          <Input
+                            value={applyForm.estimated_duration}
+                            onChange={(e) => setApplyForm({ ...applyForm, estimated_duration: e.target.value })}
+                            placeholder="e.g. 3 weeks"
+                            data-testid="duration-input"
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full bg-indigo-600"
+                          disabled={submitting}
+                          data-testid="submit-application-btn"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          {submitting ? "Submitting..." : "Submit proposal"}
+                        </Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 )}
 
                 {/* Message Modal */}
@@ -444,10 +553,52 @@ export default function JobDetail() {
                               </Link>
                               <p className="text-sm text-gray-600">{app.freelancer_profile?.title}</p>
                             </div>
-                            <span className="text-sm text-gray-500">
-                              {timeAgo(app.created_at)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              {app.status && app.status !== "pending" && (
+                                <Badge
+                                  className={
+                                    app.status === "hired"
+                                      ? "bg-green-100 text-green-700"
+                                      : app.status === "shortlisted"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : app.status === "declined"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-gray-100 text-gray-700"
+                                  }
+                                >
+                                  {app.status}
+                                </Badge>
+                              )}
+                              <span className="text-sm text-gray-500">
+                                {timeAgo(app.created_at)}
+                              </span>
+                            </div>
                           </div>
+
+                          {/* Proposal */}
+                          {(app.proposed_rate || app.estimated_duration) && (
+                            <div className="flex flex-wrap gap-4 mt-2 text-sm">
+                              {app.proposed_rate != null && (
+                                <span className="flex items-center gap-1 text-gray-700">
+                                  <DollarSign className="h-4 w-4 text-green-600" />
+                                  <span className="font-semibold">${Number(app.proposed_rate).toLocaleString()}</span>
+                                  <span className="text-gray-500">({app.proposed_rate_type || "fixed"})</span>
+                                </span>
+                              )}
+                              {app.estimated_duration && (
+                                <span className="flex items-center gap-1 text-gray-700">
+                                  <Clock className="h-4 w-4" />
+                                  {app.estimated_duration}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {app.cover_letter && (
+                            <p className="text-gray-600 text-sm mt-2 whitespace-pre-wrap bg-gray-50 rounded p-3">
+                              {app.cover_letter}
+                            </p>
+                          )}
+
                           {app.freelancer_profile && (
                             <div className="flex flex-wrap gap-2 mt-2">
                               {app.freelancer_profile.skills?.slice(0, 5).map((skill, idx) => (
@@ -457,15 +608,15 @@ export default function JobDetail() {
                               ))}
                             </div>
                           )}
-                          <div className="flex gap-2 mt-3">
+                          <div className="flex flex-wrap gap-2 mt-3">
                             <Button size="sm" variant="outline" asChild>
                               <Link to={`/freelancers/${app.freelancer_profile?.id}`}>
                                 View Profile
                               </Link>
                             </Button>
-                            <Button 
-                              size="sm" 
-                              className="bg-indigo-600 hover:bg-indigo-700"
+                            <Button
+                              size="sm"
+                              variant="outline"
                               asChild
                             >
                               <Link to={`/dashboard/messages`}>
@@ -473,6 +624,43 @@ export default function JobDetail() {
                                 Message
                               </Link>
                             </Button>
+                            {app.status === "hired" ? (
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700" asChild>
+                                <Link to={`/dashboard/contracts/${app.contract_id}`}>
+                                  <Briefcase className="h-3 w-3 mr-1" />
+                                  View Contract
+                                </Link>
+                              </Button>
+                            ) : app.status !== "declined" ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-indigo-600 hover:bg-indigo-700"
+                                  onClick={() => hireApplicant(app.id)}
+                                  data-testid={`hire-btn-${app.id}`}
+                                >
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Hire
+                                </Button>
+                                {app.status !== "shortlisted" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => updateApplication(app.id, "shortlisted")}
+                                  >
+                                    Shortlist
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600 hover:bg-red-50"
+                                  onClick={() => updateApplication(app.id, "declined")}
+                                >
+                                  Decline
+                                </Button>
+                              </>
+                            ) : null}
                           </div>
                         </div>
                       </div>

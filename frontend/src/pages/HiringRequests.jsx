@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import { useAuth, API } from "@/App";
 import Navbar from "@/components/Navbar";
@@ -174,6 +175,17 @@ export default function HiringRequests() {
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
                           Mark Complete
+                        </Button>
+                      )}
+
+                      {(req.status === "accepted" || req.status === "completed") && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-4 md:ml-2"
+                          asChild
+                        >
+                          <Link to="/dashboard/contracts">View contract</Link>
                         </Button>
                       )}
                     </div>

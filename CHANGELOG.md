@@ -6,6 +6,41 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-07 — Hiring flow: application proposals, hire, contract terms & milestones
+
+**Summary:** End-to-end Upwork/Ureed-style hiring flow. Freelancers apply with a
+proposal; clients review applicants and can hire/shortlist/decline; hiring creates a
+contract where both parties negotiate terms and milestones, then run each milestone
+through a fund → start → submit → approve → release lifecycle. Payments are **tracked
+only** (no real money yet — Stripe integration comes later).
+
+**Added / Changed — `backend/server.py`**
+- `POST /api/jobs/{id}/apply` now accepts a proposal body: `cover_letter`,
+  `proposed_rate`, `proposed_rate_type` (fixed/hourly), `estimated_duration`.
+- `PUT /api/applications/{id}` — client shortlist/decline; freelancer withdraw (+notify).
+- `POST /api/jobs/{jid}/applications/{aid}/hire` — client hires an applicant → creates an
+  active contract (linked to the job) and notifies the freelancer.
+- Contracts gained negotiation fields: `payment_type`, `total_amount`, `timeline`,
+  `agreement_status`, `client_agreed`, `freelancer_agreed`, `proposed_terms`, `milestones`.
+- `POST /api/contracts/{id}/terms` (propose/counter), `/terms/accept`, `/terms/decline`.
+- `POST /api/contracts/{id}/milestones/{mid}/action` — `fund|start|submit|approve|`
+  `release|request_changes`, role-gated with valid-transition checks; contract
+  auto-completes when every milestone is released. Notifications at each step.
+
+**Added / Changed — frontend**
+- `pages/JobDetail.jsx` — apply is now a proposal dialog (cover letter, rate, duration);
+  applicant cards show the proposal and give Hire / Shortlist / Decline / View Contract.
+- `pages/ContractDetail.jsx` — new Terms & Milestones panel: propose/counter terms with
+  milestone rows, accept/decline, and per-milestone action buttons by role/status.
+- `pages/HiringRequests.jsx` — "View contract" link on accepted/completed requests.
+
+**Tested (local, mock DB)** Full flow verified: apply-with-proposal → client notified →
+applicant view → shortlist → hire → contract → propose terms+3 milestones → freelancer
+accepts → fund/start/submit/approve/release → auto-complete. Permission checks pass
+(freelancer can't fund; can't approve a pending milestone).
+
+---
+
 ## 2026-07-06 — Guest-gated browse preview + messaging 500 fix
 
 **Summary:** Logged-out visitors browsing the marketplace now see a limited preview

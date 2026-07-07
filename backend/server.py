@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -269,6 +269,34 @@ class ContractUpdate(BaseModel):
 class DiaryEntryCreate(BaseModel):
     note: str
     entry_date: Optional[str] = None  # ISO date; defaults to today
+
+# Job application / proposal models
+class JobApplicationCreate(BaseModel):
+    cover_letter: Optional[str] = None
+    proposed_rate: Optional[float] = None
+    proposed_rate_type: Optional[str] = "fixed"  # fixed, hourly
+    estimated_duration: Optional[str] = None
+
+class ApplicationStatusUpdate(BaseModel):
+    status: str  # shortlisted, declined, withdrawn
+
+# Contract terms / milestone negotiation models
+class MilestoneInput(BaseModel):
+    title: str
+    description: Optional[str] = None
+    amount: float = 0
+    due_date: Optional[str] = None  # ISO date
+
+class ContractTermsProposal(BaseModel):
+    payment_type: str = "milestone"  # fixed, hourly, milestone
+    total_amount: Optional[float] = None
+    timeline: Optional[str] = None
+    note: Optional[str] = None
+    milestones: List[MilestoneInput] = []
+
+class MilestoneAction(BaseModel):
+    action: str  # fund, start, submit, approve, release, request_changes
+    note: Optional[str] = None
 
 # Payment Models
 class CheckoutRequest(BaseModel):
@@ -1379,6 +1407,7 @@ async def update_hiring_request(request_id: str, data: HiringRequestUpdate, requ
             contract = {
                 "id": str(uuid.uuid4()),
                 "hiring_request_id": request_id,
+                "job_id": hiring_req.get("job_id"),
                 "client_id": hiring_req["client_id"],
                 "freelancer_id": hiring_req["freelancer_id"],
                 "freelancer_user_id": freelancer_profile["user_id"] if freelancer_profile else None,
@@ -1386,6 +1415,14 @@ async def update_hiring_request(request_id: str, data: HiringRequestUpdate, requ
                 "description": hiring_req["project_description"],
                 "budget": hiring_req.get("budget"),
                 "status": "active",
+                "payment_type": None,
+                "total_amount": None,
+                "timeline": None,
+                "agreement_status": "negotiating",
+                "client_agreed": False,
+                "freelancer_agreed": False,
+                "proposed_terms": None,
+                "milestones": [],
                 "diary": [],
                 "started_at": now_iso,
                 "ended_at": None,
@@ -1556,6 +1593,226 @@ async def delete_diary_entry(contract_id: str, entry_id: str, request: Request):
         {"$pull": {"diary": {"id": entry_id}}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     return {"message": "Entry deleted"}
+
+# ==================== CONTRACT TERMS & MILESTONES ====================
+
+async def _notify(user_id: Optional[str], ntype: str, title: str, message: str, link: str):
+    """Insert a notification for a user (no-op if user_id is falsy)."""
+    if not user_id:
+        return
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "type": ntype,
+        "title": title,
+        "message": message,
+        "link": link,
+        "is_read": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@api_router.post("/contracts/{contract_id}/terms")
+async def propose_contract_terms(contract_id: str, data: ContractTermsProposal, request: Request):
+    """Propose (or counter-propose) the terms & milestones for a contract.
+    Either participant can propose; the other must accept before it takes effect."""
+    user = await require_auth(request)
+    contract, is_client, is_freelancer = await _get_contract_for_user(contract_id, user)
+
+    if data.payment_type not in ("fixed", "hourly", "milestone"):
+        raise HTTPException(status_code=400, detail="Invalid payment type")
+
+    milestones = []
+    for i, m in enumerate(data.milestones):
+        if not m.title or not m.title.strip():
+            raise HTTPException(status_code=400, detail="Each milestone needs a title")
+        milestones.append({
+            "id": str(uuid.uuid4()),
+            "title": m.title.strip(),
+            "description": (m.description or "").strip(),
+            "amount": float(m.amount or 0),
+            "due_date": m.due_date,
+            "order": i,
+        })
+
+    total = data.total_amount
+    if total is None and milestones:
+        total = sum(m["amount"] for m in milestones)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    proposed_terms = {
+        "proposed_by": user["id"],
+        "proposed_by_role": "client" if is_client else "freelancer",
+        "payment_type": data.payment_type,
+        "total_amount": total,
+        "timeline": (data.timeline or "").strip() or None,
+        "note": (data.note or "").strip() or None,
+        "milestones": milestones,
+        "created_at": now_iso,
+    }
+
+    await db.contracts.update_one(
+        {"id": contract_id},
+        {"$set": {
+            "proposed_terms": proposed_terms,
+            "agreement_status": "negotiating",
+            "client_agreed": is_client,
+            "freelancer_agreed": is_freelancer,
+            "updated_at": now_iso,
+        }}
+    )
+
+    other_id = contract.get("freelancer_user_id") if is_client else contract["client_id"]
+    await _notify(other_id, "contract_terms",
+                  "New terms proposed",
+                  f"{user['name']} proposed terms for '{contract['title']}'. Review and respond.",
+                  f"/dashboard/contracts/{contract_id}")
+    return {"message": "Terms proposed", "proposed_terms": proposed_terms}
+
+
+@api_router.post("/contracts/{contract_id}/terms/accept")
+async def accept_contract_terms(contract_id: str, request: Request):
+    """Accept the currently proposed terms. Must be the party that did NOT propose."""
+    user = await require_auth(request)
+    contract, is_client, is_freelancer = await _get_contract_for_user(contract_id, user)
+
+    terms = contract.get("proposed_terms")
+    if not terms:
+        raise HTTPException(status_code=400, detail="No terms have been proposed")
+    if terms.get("proposed_by") == user["id"]:
+        raise HTTPException(status_code=400, detail="You proposed these terms; the other party must accept")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    milestones = []
+    for m in terms.get("milestones", []):
+        milestones.append({
+            **m,
+            "status": "pending",
+            "funded_at": None,
+            "started_at": None,
+            "submitted_at": None,
+            "approved_at": None,
+            "released_at": None,
+        })
+
+    await db.contracts.update_one(
+        {"id": contract_id},
+        {"$set": {
+            "payment_type": terms.get("payment_type"),
+            "total_amount": terms.get("total_amount"),
+            "timeline": terms.get("timeline"),
+            "milestones": milestones,
+            "agreement_status": "agreed",
+            "client_agreed": True,
+            "freelancer_agreed": True,
+            "proposed_terms": None,
+            "status": "active",
+            "updated_at": now_iso,
+        }}
+    )
+
+    other_id = contract.get("freelancer_user_id") if is_client else contract["client_id"]
+    await _notify(other_id, "contract_terms",
+                  "Terms accepted",
+                  f"{user['name']} accepted the terms for '{contract['title']}'. Work can begin.",
+                  f"/dashboard/contracts/{contract_id}")
+    return {"message": "Terms accepted"}
+
+
+@api_router.post("/contracts/{contract_id}/terms/decline")
+async def decline_contract_terms(contract_id: str, request: Request):
+    """Decline the currently proposed terms (clears the proposal)."""
+    user = await require_auth(request)
+    contract, is_client, is_freelancer = await _get_contract_for_user(contract_id, user)
+
+    terms = contract.get("proposed_terms")
+    if not terms:
+        raise HTTPException(status_code=400, detail="No terms have been proposed")
+    if terms.get("proposed_by") == user["id"]:
+        raise HTTPException(status_code=400, detail="You cannot decline your own proposal")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.contracts.update_one(
+        {"id": contract_id},
+        {"$set": {"proposed_terms": None, "agreement_status": "negotiating",
+                  "client_agreed": False, "freelancer_agreed": False, "updated_at": now_iso}}
+    )
+    other_id = contract.get("freelancer_user_id") if is_client else contract["client_id"]
+    await _notify(other_id, "contract_terms",
+                  "Terms declined",
+                  f"{user['name']} declined the proposed terms for '{contract['title']}'. Send a new proposal.",
+                  f"/dashboard/contracts/{contract_id}")
+    return {"message": "Terms declined"}
+
+
+# Allowed milestone transitions: action -> (who, allowed_from_statuses, new_status)
+_MILESTONE_RULES = {
+    "fund":            ("client",     {"pending"},                         "funded"),
+    "start":           ("freelancer", {"pending", "funded"},               "in_progress"),
+    "submit":          ("freelancer", {"pending", "funded", "in_progress"}, "submitted"),
+    "approve":         ("client",     {"submitted"},                       "approved"),
+    "release":         ("client",     {"approved"},                        "released"),
+    "request_changes": ("client",     {"submitted"},                       "in_progress"),
+}
+
+
+@api_router.post("/contracts/{contract_id}/milestones/{milestone_id}/action")
+async def milestone_action(contract_id: str, milestone_id: str, data: MilestoneAction, request: Request):
+    """Advance a milestone through its lifecycle (fund/start/submit/approve/release/request_changes)."""
+    user = await require_auth(request)
+    contract, is_client, is_freelancer = await _get_contract_for_user(contract_id, user)
+
+    if contract.get("agreement_status") != "agreed":
+        raise HTTPException(status_code=400, detail="Agree on terms before working on milestones")
+
+    rule = _MILESTONE_RULES.get(data.action)
+    if not rule:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    who, allowed_from, new_status = rule
+
+    if who == "client" and not is_client:
+        raise HTTPException(status_code=403, detail="Only the client can do that")
+    if who == "freelancer" and not is_freelancer:
+        raise HTTPException(status_code=403, detail="Only the freelancer can do that")
+
+    milestones = contract.get("milestones", [])
+    ms = next((m for m in milestones if m.get("id") == milestone_id), None)
+    if not ms:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    if ms.get("status") not in allowed_from:
+        raise HTTPException(status_code=400, detail=f"Cannot {data.action} a milestone that is '{ms.get('status')}'")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    ms["status"] = new_status
+    stamp_field = {
+        "fund": "funded_at", "start": "started_at", "submit": "submitted_at",
+        "approve": "approved_at", "release": "released_at",
+    }.get(data.action)
+    if stamp_field:
+        ms[stamp_field] = now_iso
+    if data.action == "request_changes":
+        ms["submitted_at"] = None
+
+    # Auto-complete the contract when every milestone is released
+    contract_update = {"milestones": milestones, "updated_at": now_iso}
+    if milestones and all(m.get("status") == "released" for m in milestones):
+        contract_update["status"] = "completed"
+        contract_update["ended_at"] = now_iso
+
+    await db.contracts.update_one({"id": contract_id}, {"$set": contract_update})
+
+    labels = {
+        "fund": "funded", "start": "started work on", "submit": "submitted",
+        "approve": "approved", "release": "released payment for",
+        "request_changes": "requested changes on",
+    }
+    other_id = contract.get("freelancer_user_id") if is_client else contract["client_id"]
+    await _notify(other_id, "milestone",
+                  "Milestone update",
+                  f"{user['name']} {labels[data.action]} milestone '{ms['title']}' on '{contract['title']}'.",
+                  f"/dashboard/contracts/{contract_id}")
+    return {"message": "Milestone updated", "milestone": ms,
+            "contract_status": contract_update.get("status", contract["status"])}
 
 # ==================== PAYMENT ENDPOINTS ====================
 
@@ -2358,8 +2615,8 @@ async def delete_job(job_id: str, request: Request):
     return {"message": "Job deleted"}
 
 @api_router.post("/jobs/{job_id}/apply")
-async def apply_to_job(job_id: str, request: Request):
-    """Apply to a job (freelancers only) - sends a message to the client"""
+async def apply_to_job(job_id: str, request: Request, data: JobApplicationCreate = Body(default=None)):
+    """Apply to a job (freelancers only) with an optional proposal (cover letter, rate, duration)."""
     user = await require_auth(request)
     
     if user["role"] != "freelancer":
@@ -2380,11 +2637,18 @@ async def apply_to_job(job_id: str, request: Request):
     if existing:
         raise HTTPException(status_code=400, detail="You have already applied to this job")
     
+    data = data or JobApplicationCreate()
+    rate_type = data.proposed_rate_type if data.proposed_rate_type in ("fixed", "hourly") else "fixed"
+
     # Create application record
     application = {
         "id": str(uuid.uuid4()),
         "job_id": job_id,
         "freelancer_id": user["id"],
+        "cover_letter": (data.cover_letter or "").strip() or None,
+        "proposed_rate": data.proposed_rate,
+        "proposed_rate_type": rate_type,
+        "estimated_duration": (data.estimated_duration or "").strip() or None,
         "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -2455,6 +2719,104 @@ async def get_my_applications(request: Request):
             app["job"] = job
     
     return applications
+
+@api_router.put("/applications/{app_id}")
+async def update_application_status(app_id: str, data: ApplicationStatusUpdate, request: Request):
+    """Client can shortlist/decline an applicant; a freelancer can withdraw their own application."""
+    user = await require_auth(request)
+
+    application = await db.job_applications.find_one({"id": app_id})
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    job = await db.jobs.find_one({"id": application["job_id"]})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    status = data.status
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    if status in ("shortlisted", "declined"):
+        if job["client_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        await db.job_applications.update_one({"id": app_id}, {"$set": {"status": status, "updated_at": now_iso}})
+        verb = "shortlisted your application for" if status == "shortlisted" else "declined your application for"
+        await _notify(application["freelancer_id"], "job_application",
+                      "Application update", f"{user['name']} {verb} '{job['title']}'.",
+                      f"/jobs/{job['id']}")
+    elif status == "withdrawn":
+        if application["freelancer_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        await db.job_applications.update_one({"id": app_id}, {"$set": {"status": status, "updated_at": now_iso}})
+    else:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    return {"message": "Application updated", "status": status}
+
+
+@api_router.post("/jobs/{job_id}/applications/{app_id}/hire")
+async def hire_applicant(job_id: str, app_id: str, request: Request):
+    """Client hires an applicant: creates an active contract and notifies the freelancer."""
+    user = await require_auth(request)
+
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job["client_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    application = await db.job_applications.find_one({"id": app_id, "job_id": job_id})
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    # Reuse an existing contract if this applicant was already hired for this job
+    existing = await db.contracts.find_one({"job_id": job_id, "freelancer_user_id": application["freelancer_id"]})
+    if existing:
+        return {"message": "Already hired", "contract_id": existing["id"]}
+
+    freelancer_profile = await db.freelancer_profiles.find_one({"user_id": application["freelancer_id"]})
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    budget = application.get("proposed_rate")
+    if budget is None:
+        budget = job.get("budget_max") or job.get("budget_min")
+
+    contract = {
+        "id": str(uuid.uuid4()),
+        "hiring_request_id": None,
+        "job_id": job_id,
+        "client_id": user["id"],
+        "freelancer_id": freelancer_profile["id"] if freelancer_profile else None,
+        "freelancer_user_id": application["freelancer_id"],
+        "title": job["title"],
+        "description": job["description"],
+        "budget": budget,
+        "status": "active",
+        "payment_type": None,
+        "total_amount": None,
+        "timeline": application.get("estimated_duration"),
+        "agreement_status": "negotiating",
+        "client_agreed": False,
+        "freelancer_agreed": False,
+        "proposed_terms": None,
+        "milestones": [],
+        "diary": [],
+        "started_at": now_iso,
+        "ended_at": None,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    await db.contracts.insert_one(contract)
+
+    await db.job_applications.update_one(
+        {"id": app_id},
+        {"$set": {"status": "hired", "contract_id": contract["id"], "updated_at": now_iso}}
+    )
+
+    await _notify(application["freelancer_id"], "contract",
+                  "You've been hired!",
+                  f"{user['name']} hired you for '{job['title']}'. Agree on terms & milestones to begin.",
+                  f"/dashboard/contracts/{contract['id']}")
+    return {"message": "Applicant hired", "contract_id": contract["id"]}
 
 # ==================== ADMIN MODELS ====================
 
