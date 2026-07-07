@@ -6,6 +6,35 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-07 — My Applications (freelancer) & My Jobs (client) pages + progress
+
+**Summary:** Dedicated tracking pages. Freelancers get a **My Applications** page with a
+progress tracker (Applied → Shortlisted → Hired) per application; clients get a **My Jobs**
+page listing their posts with live applicant/shortlisted/hired counts. Both link through to
+the job (applicant list) or the resulting contract. Also fixed job access so a client can
+open their **own** job to review applicants.
+
+**Fixed / Changed — `backend/server.py`**
+- `GET /api/jobs/{id}` rewritten: the **owner client** now gets full job details (needed to
+  see applicants) instead of a 403/preview; guests & unsubscribed freelancers still get a
+  preview; other clients get a preview.
+- `GET /api/jobs/my-jobs` now returns `applicant_count`, `shortlisted_count`, `hired_count`
+  per job (computed live from applications).
+- Shortlist/decline notification now links to `/dashboard/applications`.
+
+**Added — frontend**
+- `pages/MyApplications.jsx` (route `/dashboard/applications`, freelancer-only) — status
+  progress bar, proposal summary, View job / View contract / Withdraw.
+- `pages/MyJobs.jsx` (route `/dashboard/jobs`, client-only) — job list with applicant
+  progress chips + View applicants / View contracts.
+- `App.js` routes + `Navbar.jsx` links ("My Applications" for freelancers, "My Jobs" for
+  clients).
+
+**Tested (local, mock DB)** Owner job view returns full details; my-jobs counts update
+after apply/hire; my-applications shows status + `contract_id` after hire.
+
+---
+
 ## 2026-07-07 — Hiring flow: application proposals, hire, contract terms & milestones
 
 **Summary:** End-to-end Upwork/Ureed-style hiring flow. Freelancers apply with a

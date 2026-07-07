@@ -22,6 +22,8 @@ import Contracts from "@/pages/Contracts";
 import ContractDetail from "@/pages/ContractDetail";
 import Messages from "@/pages/Messages";
 import HiringRequests from "@/pages/HiringRequests";
+import MyApplications from "@/pages/MyApplications";
+import MyJobs from "@/pages/MyJobs";
 import Pricing from "@/pages/Pricing";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import Feed from "@/pages/Feed";
@@ -228,6 +230,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <HiringRequests />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/applications"
+        element={
+          <ProtectedRoute roles={["freelancer"]}>
+            <MyApplications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/jobs"
+        element={
+          <ProtectedRoute roles={["client"]}>
+            <MyJobs />
           </ProtectedRoute>
         }
       />

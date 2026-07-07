@@ -2512,7 +2512,13 @@ async def get_my_jobs(request: Request):
     
     jobs = await db.jobs.find({"client_id": user["id"]}, {"_id": 0}).to_list(200)
     jobs.sort(key=lambda j: j.get("created_at") or "", reverse=True)
-    
+
+    for job in jobs:
+        apps = await db.job_applications.find({"job_id": job["id"]}, {"_id": 0}).to_list(500)
+        job["applicant_count"] = len(apps)
+        job["hired_count"] = sum(1 for a in apps if a.get("status") == "hired")
+        job["shortlisted_count"] = sum(1 for a in apps if a.get("status") == "shortlisted")
+
     return jobs
 
 @api_router.get("/jobs/categories")
@@ -2528,39 +2534,13 @@ async def get_job_categories():
 
 @api_router.get("/jobs/{job_id}")
 async def get_job(job_id: str, request: Request):
-    """Get a single job posting - freelancers need subscription for full details"""
+    """Get a single job posting. Owner client sees full details + applicants; other
+    clients/guests/unsubscribed freelancers get a limited preview."""
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
-    # Check if user is authenticated
-    try:
-        user = await require_auth(request)
-        user_role = user["role"]
-        
-        # Clients should not access job details (they post jobs, not view them)
-        if user_role == "client":
-            raise HTTPException(status_code=403, detail="Clients cannot view job details")
-        
-        # Check if freelancer has active subscription
-        if user_role == "freelancer":
-            profile = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
-            has_subscription = profile and profile.get("subscription_status") == "active"
-            
-            if not has_subscription:
-                # Return limited job info for non-subscribed freelancers
-                return {
-                    "id": job["id"],
-                    "title": job["title"],
-                    "category": job.get("category"),
-                    "budget_type": job.get("budget_type"),
-                    "created_at": job.get("created_at"),
-                    "remote": job.get("remote"),
-                    "requires_subscription": True,
-                    "preview_only": True
-                }
-    except HTTPException as e:
-        # Not authenticated - return limited preview
+
+    def _preview():
         return {
             "id": job["id"],
             "title": job["title"],
@@ -2569,14 +2549,30 @@ async def get_job(job_id: str, request: Request):
             "created_at": job.get("created_at"),
             "remote": job.get("remote"),
             "requires_subscription": True,
-            "preview_only": True
+            "preview_only": True,
         }
-    
-    # Full access for subscribed freelancers
+
+    user = await get_current_user(request)
+
+    # Guests get a limited preview
+    if not user:
+        return _preview()
+
+    # Clients: only the owner can view their own job (with applicants)
+    if user["role"] == "client":
+        if job["client_id"] != user["id"]:
+            return _preview()
+        # owner -> full access below
+    # Freelancers need an active subscription for full details
+    elif user["role"] == "freelancer":
+        profile = await db.freelancer_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+        has_subscription = profile and profile.get("subscription_status") == "active"
+        if not has_subscription:
+            return _preview()
+
     client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
     if client:
         job["client"] = client
-    
     return job
 
 @api_router.put("/jobs/{job_id}")
@@ -2742,7 +2738,7 @@ async def update_application_status(app_id: str, data: ApplicationStatusUpdate, 
         verb = "shortlisted your application for" if status == "shortlisted" else "declined your application for"
         await _notify(application["freelancer_id"], "job_application",
                       "Application update", f"{user['name']} {verb} '{job['title']}'.",
-                      f"/jobs/{job['id']}")
+                      "/dashboard/applications")
     elif status == "withdrawn":
         if application["freelancer_id"] != user["id"]:
             raise HTTPException(status_code=403, detail="Not authorized")

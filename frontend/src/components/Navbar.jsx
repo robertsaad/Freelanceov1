@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Menu, X, User, LayoutDashboard, MessageSquare, FileText, LogOut, 
   ChevronDown, Briefcase, Search, Users, Code, Palette, PenTool, 
-  Video, TrendingUp, Database, Smartphone, Music, Building, ArrowRight, Shield, CreditCard, BarChart3, HeartPulse, FileSignature 
+  Video, TrendingUp, Database, Smartphone, Music, Building, ArrowRight, Shield, CreditCard, BarChart3, HeartPulse, FileSignature, ClipboardList 
 } from "lucide-react";
 
 const categories = [
@@ -288,6 +288,22 @@ export default function Navbar() {
                       <Link to="/dashboard/company" className="flex items-center gap-2" data-testid="company-settings-link">
                         <Building className="h-4 w-4" />
                         Company Settings
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {user.role === "client" && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard/jobs" className="flex items-center gap-2" data-testid="my-jobs-link">
+                        <Briefcase className="h-4 w-4" />
+                        My Jobs
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {user.role === "freelancer" && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard/applications" className="flex items-center gap-2" data-testid="my-applications-link">
+                        <ClipboardList className="h-4 w-4" />
+                        My Applications
                       </Link>
                     </DropdownMenuItem>
                   )}
