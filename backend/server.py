@@ -137,6 +137,7 @@ class UserResponse(BaseModel):
     picture: Optional[str] = None
     role: str
     auth_provider: str
+    token: Optional[str] = None
 
 # Freelancer Models
 class PortfolioItem(BaseModel):
@@ -453,7 +454,8 @@ async def register(data: UserRegister, response: Response):
         name=data.name,
         picture=None,
         role=data.role,
-        auth_provider="email"
+        auth_provider="email",
+        token=token
     )
 
 @api_router.post("/auth/login", response_model=UserResponse)
@@ -493,7 +495,8 @@ async def login(data: UserLogin, response: Response):
         name=user["name"],
         picture=user.get("picture"),
         role=user["role"],
-        auth_provider=user["auth_provider"]
+        auth_provider=user["auth_provider"],
+        token=token
     )
 
 @api_router.get("/auth/me", response_model=UserResponse)

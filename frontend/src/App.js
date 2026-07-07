@@ -36,6 +36,22 @@ import Admin from "@/pages/Admin";
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Bearer-token auth: works even when browsers block cross-site (third-party) cookies.
+const setAuthToken = (token) => {
+  if (token) {
+    localStorage.setItem("auth_token", token);
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  } else {
+    localStorage.removeItem("auth_token");
+    delete axios.defaults.headers.common["Authorization"];
+  }
+};
+// Restore the token on initial page load so the first requests are authenticated.
+if (typeof window !== "undefined") {
+  const _saved = localStorage.getItem("auth_token");
+  if (_saved) axios.defaults.headers.common["Authorization"] = `Bearer ${_saved}`;
+}
+
 // Auth Context
 const AuthContext = createContext(null);
 
@@ -61,18 +77,25 @@ function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password }, { withCredentials: true });
+    if (response.data?.token) setAuthToken(response.data.token);
     setUser(response.data);
     return response.data;
   };
 
   const register = async (email, password, name, role) => {
     const response = await axios.post(`${API}/auth/register`, { email, password, name, role }, { withCredentials: true });
+    if (response.data?.token) setAuthToken(response.data.token);
     setUser(response.data);
     return response.data;
   };
 
   const logout = async () => {
-    await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
+    try {
+      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
+    } catch (e) {
+      /* ignore */
+    }
+    setAuthToken(null);
     setUser(null);
   };
 

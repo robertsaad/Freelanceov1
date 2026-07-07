@@ -6,6 +6,33 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-07 — Fix "not authenticated" on writes (CORS + Bearer token auth)
+
+**Summary:** Posting a job (and other authenticated writes) failed with "Not authenticated"
+in the browser. Two fixes: corrected the Azure CORS preflight, and switched the frontend to
+**Bearer-token auth** so it no longer depends on fragile cross-site cookies.
+
+**Root cause**
+- Azure App Service **platform CORS** was intercepting the `OPTIONS` preflight and returning
+  an empty `Access-Control-Allow-Methods`, and cross-site (third-party) session cookies are
+  unreliable in modern browsers — so credentialed `POST`s were blocked / unauthenticated.
+  (Server-side the endpoint worked fine — verified `POST /jobs` = 200 with a token/cookie.)
+
+**Fixes**
+- **Azure (infra, already applied):** removed the platform CORS origins so the app's own
+  Starlette CORS (which supports credentials + methods) handles preflight. Preflight now
+  returns `Allow-Methods: …, POST, …` and `Allow-Credentials: true`. Restarted the app.
+- **`backend/server.py`:** `POST /auth/login` and `/auth/register` now return a `token`
+  (JWT) in the response body (`UserResponse.token`). Cookie is still set too.
+- **`frontend/src/App.js`:** stores the token in `localStorage`, sets a default
+  `Authorization: Bearer` header on all axios requests, restores it on page load, and clears
+  it on logout. Works even when third-party cookies are blocked.
+
+**Tested (local)** login returns a 171-char token; frontend compiles clean. Prod preflight
+now advertises POST with credentials.
+
+---
+
 ## 2026-07-07 — Job numbers + @job mentions in chat
 
 **Summary:** Every job now has a short human-friendly number (e.g. `#9`), and in chat you
