@@ -2561,13 +2561,19 @@ async def get_job_categories():
     return [{"name": r["_id"], "count": r["count"]} for r in results if r["_id"]]
 
 @api_router.get("/jobs/mention-search")
-async def mention_search_jobs(request: Request, q: Optional[str] = None):
+async def mention_search_jobs(request: Request, q: Optional[str] = None, partner: Optional[str] = None):
     """Autocomplete for @job mentions in chat. Matches by job number or title.
-    Returns open jobs plus the current user's own jobs."""
+    Scope: a client can only tag their OWN jobs; a freelancer can only tag jobs owned by
+    the client they're currently chatting with (`partner` = the other user's id)."""
     user = await require_auth(request)
-    query: Dict[str, Any] = {}
-    ors = [{"status": "open"}, {"client_id": user["id"]}]
-    query["$or"] = ors
+
+    if user["role"] == "client":
+        query: Dict[str, Any] = {"client_id": user["id"]}
+    else:
+        # Freelancer must be in a conversation with a client to tag that client's jobs
+        if not partner:
+            return []
+        query = {"client_id": partner}
 
     jobs = await db.jobs.find(query, {"_id": 0, "id": 1, "job_number": 1, "title": 1, "status": 1}).to_list(500)
 

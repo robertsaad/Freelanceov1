@@ -136,7 +136,11 @@ export default function Messages() {
 
   const fetchSuggest = async (q) => {
     try {
-      const r = await axios.get(`${API}/jobs/mention-search?q=${encodeURIComponent(q)}`, { withCredentials: true });
+      const partner = selectedUser?.id || "";
+      const r = await axios.get(
+        `${API}/jobs/mention-search?q=${encodeURIComponent(q)}&partner=${encodeURIComponent(partner)}`,
+        { withCredentials: true }
+      );
       const list = r.data || [];
       setSuggest(list);
       setSuggestOpen(list.length > 0);

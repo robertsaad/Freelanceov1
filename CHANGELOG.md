@@ -16,8 +16,10 @@ chip that opens a small job-details dialog (with "Open full job").
 - Jobs get a sequential `job_number` (atomic counter in a `counters` collection). New
   jobs get one on creation; a startup migration **backfills** existing jobs and syncs the
   counter (idempotent, runs on prod + local).
-- `GET /api/jobs/mention-search?q=` — autocomplete for `@job` tags (matches by number or
-  title; returns open jobs + the caller's own jobs). Placed before `/jobs/{job_id}`.
+- `GET /api/jobs/mention-search?q=&partner=` — autocomplete for `@job` tags, **scoped by
+  conversation**: a client sees only their own jobs; a freelancer sees only the jobs of the
+  client they're chatting with (`partner` = the other user's id; empty for a freelancer with
+  no partner). Placed before `/jobs/{job_id}`.
 - `GET /api/jobs/ref/{job_number}` — lightweight job card for the mention chip dialog.
 
 **Added / Changed — `frontend/src/pages/Messages.jsx`**
