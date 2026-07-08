@@ -134,6 +134,8 @@ class UserResponse(BaseModel):
     id: str
     email: str
     name: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     picture: Optional[str] = None
     role: str
     auth_provider: str
@@ -245,6 +247,7 @@ class ClientProfileCreate(BaseModel):
     industry: Optional[str] = None
     description: Optional[str] = None
     phone: Optional[str] = None
+    time_zone: Optional[str] = None
     country: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
@@ -525,6 +528,8 @@ async def get_me(request: Request):
         id=user["id"],
         email=user["email"],
         name=user["name"],
+        first_name=user.get("first_name"),
+        last_name=user.get("last_name"),
         picture=user.get("picture"),
         role=user["role"],
         auth_provider=user["auth_provider"]
@@ -532,13 +537,23 @@ async def get_me(request: Request):
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     picture: Optional[str] = None
 
 @api_router.put("/auth/me", response_model=UserResponse)
 async def update_me(data: AccountUpdate, request: Request):
-    """Update the current user's account details (display name / picture)."""
+    """Update the current user's account details (name / picture)."""
     user = await require_auth(request)
     updates = {}
+    if data.first_name is not None or data.last_name is not None:
+        fn = (data.first_name if data.first_name is not None else user.get("first_name") or "").strip()
+        ln = (data.last_name if data.last_name is not None else user.get("last_name") or "").strip()
+        updates["first_name"] = fn
+        updates["last_name"] = ln
+        combined = f"{fn} {ln}".strip()
+        if combined:
+            updates["name"] = combined
     if data.name is not None and data.name.strip():
         updates["name"] = data.name.strip()
     if data.picture is not None:
@@ -551,6 +566,8 @@ async def update_me(data: AccountUpdate, request: Request):
         id=user["id"],
         email=user["email"],
         name=user["name"],
+        first_name=user.get("first_name"),
+        last_name=user.get("last_name"),
         picture=user.get("picture"),
         role=user["role"],
         auth_provider=user["auth_provider"],

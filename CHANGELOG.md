@@ -6,6 +6,23 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-08 — Client "My Info" settings (Upwork-style)
+
+**Summary:** Reworked the client Settings page into an Upwork-style **My Info** with three
+cards: **Account** (first name, last name split; avatar; read-only email), **Company details**
+(company **logo upload** + name, website, org size, industry, description), and **Company
+contacts** (owner, phone, **time zone**, address). Single Save. Navbar client menu item renamed
+to **Settings**.
+
+**Changed — `backend/server.py`**
+- `AccountUpdate` + `UserResponse` gain `first_name`/`last_name`; `PUT /auth/me` sets them and
+  derives `name`. `ClientProfileCreate` gains `time_zone`.
+
+**Changed — `frontend/src/pages/ClientSettings.jsx`, `components/Navbar.jsx`**
+- Three-card My Info layout, logo upload via `/api/uploads`, time-zone picker.
+
+---
+
 ## 2026-07-08 — Dashboard opens split-view jobs, profile fixes, blob private endpoint
 
 **Summary:** Clicking a job from the Dashboard now opens the **LinkedIn-style split view**
