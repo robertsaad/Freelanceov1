@@ -637,8 +637,9 @@ async def list_freelancer_countries():
     return countries
 
 @api_router.get("/freelancers/featured")
-async def get_featured_freelancers():
-    """Get top rated freelancers for homepage"""
+async def get_featured_freelancers(request: Request):
+    """Get top rated freelancers for homepage. Guests get a redacted preview
+    (title + rating only) so names/details are gated behind sign-up."""
     freelancers = await db.freelancer_profiles.find(
         {"subscription_status": "active", "is_suspended": {"$ne": True}},
         {"_id": 0}
@@ -651,7 +652,23 @@ async def get_featured_freelancers():
         user = await db.users.find_one({"id": f["user_id"]}, {"_id": 0, "password_hash": 0})
         if user:
             f["user"] = user
-    
+
+    # Redact for guests: only title + rating are visible, rest is gated
+    viewer = await get_current_user(request)
+    if not viewer:
+        return [
+            {
+                "id": f.get("id"),
+                "title": f.get("title"),
+                "category": f.get("category"),
+                "average_rating": f.get("average_rating"),
+                "total_reviews": f.get("total_reviews"),
+                "is_featured": f.get("is_featured"),
+                "preview_only": True,
+            }
+            for f in freelancers
+        ]
+
     return freelancers
 
 @api_router.get("/freelancers/categories")
@@ -2517,20 +2534,37 @@ async def list_jobs(
     }
 
 @api_router.get("/jobs/featured")
-async def get_featured_jobs():
-    """Get recent job postings for homepage"""
+async def get_featured_jobs(request: Request):
+    """Get recent job postings for homepage. Guests get a redacted preview
+    (title only) so job details are gated behind sign-up."""
     jobs = await db.jobs.find(
         {"status": "open"},
         {"_id": 0}
     ).to_list(200)
     jobs.sort(key=lambda j: j.get("created_at") or "", reverse=True)
     jobs = jobs[:6]
-    
+
+    viewer = await get_current_user(request)
+    if not viewer:
+        return [
+            {
+                "id": j.get("id"),
+                "title": j.get("title"),
+                "category": j.get("category"),
+                "budget_type": j.get("budget_type"),
+                "created_at": j.get("created_at"),
+                "remote": j.get("remote"),
+                "skills_required": j.get("skills_required", []),
+                "preview_only": True,
+            }
+            for j in jobs
+        ]
+
     for job in jobs:
         client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
         if client:
             job["client"] = client
-    
+
     return jobs
 
 @api_router.get("/jobs/my-jobs")

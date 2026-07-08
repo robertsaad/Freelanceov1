@@ -6,6 +6,28 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-08 — Gate the landing page featured sections for guests
+
+**Summary:** On the home page, logged-out visitors could see freelancer **names** and full
+job details in the "featured" sections. Now guests see **titles + rating only** (greyed /
+blurred with a sign-up CTA), matching the /freelancers and /jobs list pages.
+
+**Changed — `backend/server.py`**
+- `GET /freelancers/featured` and `GET /jobs/featured` now take the request and **redact for
+  guests** (no logged-in viewer): freelancers → `{title, category, rating, preview_only}`;
+  jobs → `{title, category, budget_type, remote, skills, preview_only}`. Logged-in users get
+  full data (via the Bearer token / cookie).
+
+**Changed — `frontend/src/pages/Landing.jsx`**
+- Auth-aware (`useAuth`); featured fetches send credentials; `FreelancerCard` gets
+  `locked={!user}` so guest cards show the locked teaser. `JobCard` already honours
+  `preview_only`.
+
+**Tested (local)** guest featured → names/clients/budgets empty + `preview_only`; logged-in
+featured → full names. Frontend compiles clean.
+
+---
+
 ## 2026-07-07 — Fix "not authenticated" on writes (CORS + Bearer token auth)
 
 **Summary:** Posting a job (and other authenticated writes) failed with "Not authenticated"

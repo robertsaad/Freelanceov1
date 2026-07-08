@@ -7,7 +7,7 @@ import FreelancerCard from "@/components/FreelancerCard";
 import JobCard from "@/components/JobCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { API } from "@/App";
+import { API, useAuth } from "@/App";
 import {
   Search,
   ArrowRight,
@@ -41,6 +41,7 @@ const stats = [
 ];
 
 export default function Landing() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [featuredFreelancers, setFeaturedFreelancers] = useState([]);
   const [featuredJobs, setFeaturedJobs] = useState([]);
@@ -54,7 +55,7 @@ export default function Landing() {
 
   const fetchFeaturedFreelancers = async () => {
     try {
-      const response = await axios.get(`${API}/freelancers/featured`);
+      const response = await axios.get(`${API}/freelancers/featured`, { withCredentials: true });
       setFeaturedFreelancers(response.data);
     } catch (error) {
       console.error("Error fetching featured freelancers:", error);
@@ -65,7 +66,7 @@ export default function Landing() {
 
   const fetchFeaturedJobs = async () => {
     try {
-      const response = await axios.get(`${API}/jobs/featured`);
+      const response = await axios.get(`${API}/jobs/featured`, { withCredentials: true });
       setFeaturedJobs(response.data);
     } catch (error) {
       console.error("Error fetching featured jobs:", error);
@@ -235,7 +236,7 @@ export default function Landing() {
           ) : featuredFreelancers.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredFreelancers.map((freelancer) => (
-                <FreelancerCard key={freelancer.id} freelancer={freelancer} />
+                <FreelancerCard key={freelancer.id} freelancer={freelancer} locked={!user} />
               ))}
             </div>
           ) : (
