@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Plus, X, Save, Trash2, Upload, Loader2, Image as ImageIcon, Video, Music, Eye, CheckCircle2, Circle } from "lucide-react";
+import { Plus, X, Save, Trash2, Upload, Loader2, Image as ImageIcon, Video, Music, Eye, CheckCircle2, Circle, ArrowLeft } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
 import { COUNTRIES, getAddressConfig, getPostalError } from "@/lib/locationData";
 
@@ -270,6 +270,10 @@ export default function EditProfile() {
       <Navbar />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back */}
+        <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/dashboard"))} data-testid="back-btn">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+        </Button>
         {/* Header bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>

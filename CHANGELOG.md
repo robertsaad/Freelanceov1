@@ -6,6 +6,19 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-08 — Robust back arrows (fix Preview new-tab)
+
+**Summary:** The "Preview public profile" button opens the profile in a **new tab**, where
+the browser has no history, so the back arrow did nothing. Back buttons now **fall back to a
+sensible route** when there's no history (owner → `/dashboard/profile`, otherwise
+`/freelancers`; job detail → `/jobs`; editor → `/dashboard`). Added a back arrow to the
+**Edit Profile** page.
+
+**Changed — `frontend/src/pages/FreelancerProfile.jsx`, `JobDetail.jsx`, `EditProfile.jsx`**
+- Smart back handler (`history.length > 1 ? navigate(-1) : navigate(fallback)`).
+
+---
+
 ## 2026-07-08 — Upwork-style job detail + back arrows
 
 **Summary:** Clicking a job now opens an **Upwork-style two-column view** with a **back

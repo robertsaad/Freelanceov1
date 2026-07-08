@@ -226,7 +226,7 @@ export default function FreelancerProfile() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back */}
-        <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => navigate(-1)} data-testid="back-btn">
+        <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => { if (window.history.length > 1) { navigate(-1); } else { const owner = user?.id && (freelancer?.user_id || freelancer?.user?.id) === user.id; navigate(owner ? "/dashboard/profile" : "/freelancers"); } }} data-testid="back-btn">
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
         {/* Main Profile Card */}

@@ -267,7 +267,7 @@ export default function JobDetail() {
         <Navbar />
         
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => navigate(-1)} data-testid="back-btn">
+          <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/jobs"))} data-testid="back-btn">
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
           {/* Preview Card */}
@@ -343,7 +343,7 @@ export default function JobDetail() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Back */}
-        <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => navigate(-1)} data-testid="back-btn">
+        <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/jobs"))} data-testid="back-btn">
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
 
