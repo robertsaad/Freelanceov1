@@ -6,6 +6,40 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-08 — Instagram-style portfolio gallery
+
+**Summary:** Portfolios can now scale to many projects. The profile shows a **6-item
+preview**; **"Show all N projects"** opens a dedicated Instagram-style gallery page
+(square-tile grid + lightbox with prev/next). The Edit Profile portfolio is now a
+gallery-style square grid too (hover-to-delete), with a "Show all N" toggle.
+
+**Added — `frontend/src/pages/PortfolioGallery.jsx`** (route `/freelancers/:id/portfolio`)
+- Responsive square-tile grid (2 cols mobile / 3 desktop), lazy images, hover title,
+  video/audio badges. Click a tile → lightbox modal (media, title, description, link,
+  prev/next navigation).
+
+**Changed — `frontend/src/App.js`**
+- Registered `/freelancers/:id/portfolio` route + import.
+
+**Changed — `frontend/src/pages/FreelancerProfile.jsx`**
+- Always show 6 preview items; "Show all" now navigates to the gallery page.
+
+**Changed — `frontend/src/pages/EditProfile.jsx`**
+- Portfolio existing items rendered as a gallery-style square grid with hover-delete.
+
+---
+
+## 2026-07-08 — Portfolio "show all" pagination (handle 10+ projects)
+
+**Summary:** When a freelancer has many portfolio projects, both the editor and the
+public profile now show the **first 6** with a **"Show all N"** toggle (collapses back
+with "Show less"), keeping long lists compact. Verified with 10 items.
+
+**Changed — `frontend/src/pages/EditProfile.jsx`, `frontend/src/pages/FreelancerProfile.jsx`**
+- Added `showAllPortfolio` state; slice to 6 by default; count label + toggle button.
+
+---
+
 ## 2026-07-08 — Gate the landing page featured sections for guests
 
 **Summary:** On the home page, logged-out visitors could see freelancer **names** and full

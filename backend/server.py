@@ -166,6 +166,15 @@ class LanguageItem(BaseModel):
     language: str
     proficiency: str  # basic, conversational, fluent, native
 
+class CertificationItem(BaseModel):
+    name: str
+    issuer: Optional[str] = None
+    year: Optional[str] = None
+
+class OtherExperienceItem(BaseModel):
+    title: str
+    description: Optional[str] = None
+
 class FreelancerProfileCreate(BaseModel):
     title: str
     bio: str
@@ -183,6 +192,11 @@ class FreelancerProfileCreate(BaseModel):
     employment_history: Optional[List[EmploymentHistoryItem]] = None
     education: Optional[List[EducationItem]] = None
     languages: Optional[List[LanguageItem]] = None
+    certifications: Optional[List[CertificationItem]] = None
+    licenses: Optional[List[CertificationItem]] = None
+    other_experiences: Optional[List[OtherExperienceItem]] = None
+    hours_per_week: Optional[str] = None
+    video_intro_url: Optional[str] = None
     phone: Optional[str] = None
     date_of_birth: Optional[str] = None
     country: Optional[str] = None
@@ -210,6 +224,11 @@ class FreelancerProfileUpdate(BaseModel):
     employment_history: Optional[List[EmploymentHistoryItem]] = None
     education: Optional[List[EducationItem]] = None
     languages: Optional[List[LanguageItem]] = None
+    certifications: Optional[List[CertificationItem]] = None
+    licenses: Optional[List[CertificationItem]] = None
+    other_experiences: Optional[List[OtherExperienceItem]] = None
+    hours_per_week: Optional[str] = None
+    video_intro_url: Optional[str] = None
     phone: Optional[str] = None
     date_of_birth: Optional[str] = None
     country: Optional[str] = None
@@ -770,6 +789,11 @@ async def create_freelancer_profile(data: FreelancerProfileCreate, request: Requ
         "employment_history": [e.model_dump() for e in data.employment_history] if data.employment_history else [],
         "education": [e.model_dump() for e in data.education] if data.education else [],
         "languages": [l.model_dump() for l in data.languages] if data.languages else [],
+        "certifications": [c.model_dump() for c in data.certifications] if data.certifications else [],
+        "licenses": [c.model_dump() for c in data.licenses] if data.licenses else [],
+        "other_experiences": [o.model_dump() for o in data.other_experiences] if data.other_experiences else [],
+        "hours_per_week": data.hours_per_week,
+        "video_intro_url": data.video_intro_url,
         "phone": data.phone,
         "date_of_birth": data.date_of_birth,
         "country": data.country,

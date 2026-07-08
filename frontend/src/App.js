@@ -10,6 +10,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import FreelancersList from "@/pages/FreelancersList";
 import FreelancerProfile from "@/pages/FreelancerProfile";
+import PortfolioGallery from "@/pages/PortfolioGallery";
 import Dashboard from "@/pages/Dashboard";
 import EditProfile from "@/pages/EditProfile";
 import FreelancerOnboarding from "@/pages/FreelancerOnboarding";
@@ -142,6 +143,7 @@ function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route path="/freelancers" element={<FreelancersList />} />
       <Route path="/freelancers/:id" element={<FreelancerProfile />} />
+      <Route path="/freelancers/:id/portfolio" element={<PortfolioGallery />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
       <Route

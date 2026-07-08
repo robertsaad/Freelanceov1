@@ -401,11 +401,11 @@ export default function FreelancerProfile() {
         {freelancer.portfolio_items?.length > 0 && (
           <Card className="mb-6" data-testid="portfolio-section">
             <CardHeader>
-              <CardTitle>Portfolio</CardTitle>
+              <CardTitle>Portfolio ({freelancer.portfolio_items.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {freelancer.portfolio_items.map((item) => (
+                {freelancer.portfolio_items.slice(0, 6).map((item) => (
                   <div key={item.id} className="border rounded-lg p-4 hover:border-cyan-200 transition-colors">
                     {item.media_type === "image" && item.media_url ? (
                       <img
@@ -447,6 +447,92 @@ export default function FreelancerProfile() {
                   </div>
                 ))}
               </div>
+              {freelancer.portfolio_items.length > 6 && (
+                <div className="text-center mt-6">
+                  <Button variant="outline" onClick={() => navigate(`/freelancers/${id}/portfolio`)} data-testid="view-all-portfolio">
+                    Show all {freelancer.portfolio_items.length} projects
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Work history (employment) */}
+        {freelancer.employment_history?.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader><CardTitle>Work history</CardTitle></CardHeader>
+            <CardContent className="space-y-5">
+              {freelancer.employment_history.map((job, i) => (
+                <div key={i} className="border-l-2 border-cyan-100 pl-4">
+                  <h4 className="font-semibold text-gray-900">{job.title}{job.company ? ` · ${job.company}` : ""}</h4>
+                  <p className="text-sm text-gray-500">{[job.start_date, job.currently_working ? "Present" : job.end_date].filter(Boolean).join(" - ")}</p>
+                  {job.description && <p className="text-gray-600 text-sm mt-1 whitespace-pre-line">{job.description}</p>}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Certifications */}
+        {freelancer.certifications?.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader><CardTitle>Certifications</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {freelancer.certifications.map((c, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900">{c.name}</p>
+                    {c.issuer && <p className="text-sm text-gray-500">{c.issuer}</p>}
+                  </div>
+                  {c.year && <span className="text-sm text-gray-400">{c.year}</span>}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Education */}
+        {freelancer.education?.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader><CardTitle>Education</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {freelancer.education.map((ed, i) => (
+                <div key={i}>
+                  <p className="font-medium text-gray-900">{ed.school}</p>
+                  <p className="text-sm text-gray-600">{[ed.degree, ed.field_of_study].filter(Boolean).join(", ")}</p>
+                  <p className="text-xs text-gray-400">{[ed.start_year, ed.end_year].filter(Boolean).join(" - ")}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Languages */}
+        {freelancer.languages?.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader><CardTitle>Languages</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {freelancer.languages.map((l, i) => (
+                  <Badge key={i} variant="secondary">{l.language}{l.proficiency ? ` — ${l.proficiency}` : ""}</Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Other experiences */}
+        {freelancer.other_experiences?.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader><CardTitle>Other experiences</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {freelancer.other_experiences.map((o, i) => (
+                <div key={i}>
+                  <p className="font-medium text-gray-900">{o.title}</p>
+                  {o.description && <p className="text-sm text-gray-600 mt-1">{o.description}</p>}
+                </div>
+              ))}
             </CardContent>
           </Card>
         )}
