@@ -204,6 +204,39 @@ export default function FreelancerProfile() {
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
+  const getVideoEmbed = (url) => {
+    if (!url) return null;
+    const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]+)/);
+    if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+    const vm = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    if (vm) return `https://player.vimeo.com/video/${vm[1]}`;
+    const lm = url.match(/loom\.com\/share\/([\w-]+)/);
+    if (lm) return `https://www.loom.com/embed/${lm[1]}`;
+    return null;
+  };
+
+  const renderVideo = () => {
+    const url = freelancer?.video_intro_url;
+    if (!url) return null;
+    const embed = getVideoEmbed(url);
+    if (embed) {
+      return (
+        <div className="aspect-video w-full overflow-hidden rounded-lg bg-black">
+          <iframe src={embed} title="Video introduction" className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+        </div>
+      );
+    }
+    if (/\.(mp4|webm|mov)(\?|$)/i.test(url)) {
+      const src = url.startsWith("http") ? url : `${BACKEND_URL}${url}`;
+      return <video src={src} controls className="w-full rounded-lg bg-black" />;
+    }
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-cyan-600 hover:underline">
+        Watch video introduction <ExternalLink className="h-4 w-4" />
+      </a>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -221,6 +254,7 @@ export default function FreelancerProfile() {
   if (!freelancer) return null;
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1";
+  const isOwnProfile = !!(user?.id && (freelancer?.user_id || freelancer?.user?.id) === user.id);
 
   return (
     <div className="min-h-screen bg-gray-50" data-testid="freelancer-profile-page">
@@ -298,6 +332,7 @@ export default function FreelancerProfile() {
             </div>
 
             {/* Action Buttons */}
+            {!(isOwnProfile || isPreview) && (
             <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t justify-center md:justify-start">
               {/* Follow Button */}
               <Button
@@ -401,8 +436,17 @@ export default function FreelancerProfile() {
                 </DialogContent>
               </Dialog>
             </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Video introduction */}
+        {freelancer.video_intro_url && (
+          <Card className="mb-6" data-testid="video-section">
+            <CardHeader><CardTitle>Video introduction</CardTitle></CardHeader>
+            <CardContent>{renderVideo()}</CardContent>
+          </Card>
+        )}
 
         {/* Portfolio Section */}
         {freelancer.portfolio_items?.length > 0 && (

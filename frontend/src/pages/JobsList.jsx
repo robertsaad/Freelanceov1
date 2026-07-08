@@ -133,14 +133,21 @@ export default function JobsList() {
     }
   };
 
-  // Auto-select the first job on desktop
+  // Auto-select a job on desktop (or the one from ?job=)
   useEffect(() => {
-    if (!requiresSubscription && jobs.length > 0 && typeof window !== "undefined" && window.innerWidth >= 1024) {
-      if (!selectedId || !jobs.find((j) => j.id === selectedId)) {
-        openJob(jobs[0]);
-      }
+    if (requiresSubscription || jobs.length === 0) return;
+    const targetId = searchParams.get("job");
+    const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
+    if (targetId) {
+      if (selectedId === targetId) return;
+      const found = jobs.find((j) => j.id === targetId);
+      openJob(found || { id: targetId });
+      return;
     }
-  }, [jobs, requiresSubscription]);
+    if (isDesktop && (!selectedId || !jobs.find((j) => j.id === selectedId))) {
+      openJob(jobs[0]);
+    }
+  }, [jobs, requiresSubscription, searchParams]);
 
   // Load applied job ids for freelancers
   useEffect(() => {

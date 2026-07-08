@@ -6,6 +6,27 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-08 — Dashboard opens split-view jobs, profile fixes, blob private endpoint
+
+**Summary:** Clicking a job from the Dashboard now opens the **LinkedIn-style split view**
+(`/jobs?job=<id>`) with that job pre-selected, instead of the single-page view. Also fixed:
+the **video intro** now renders on the public profile, and in **preview mode** the
+Follow/Hire/Message buttons are hidden (you're viewing your own profile). Infra: added a
+**private endpoint** for blob storage so uploads work with public network access disabled.
+
+**Changed — `frontend/src/pages/Dashboard.jsx`, `JobsList.jsx`**
+- Dashboard job rows link to `/jobs?job=<id>`; JobsList reads `?job=` and pre-selects it.
+
+**Changed — `frontend/src/pages/FreelancerProfile.jsx`**
+- Render `video_intro_url`; hide Follow/Hire/Message when `?preview=1` (own profile).
+
+**Infra (Azure, dev/test)**
+- `freelanceo-blob-pe` private endpoint in `snet-pe` + `privatelink.blob.core.windows.net`
+  DNS zone linked to `freelanceo-vnet` (reused the Cosmos DB VNet). Blob IP `10.20.2.6`.
+  App `vnetRouteAllEnabled=true`. Verified live upload + retrieval work.
+
+---
+
 ## 2026-07-08 — LinkedIn-style split-view jobs + preview back fix
 
 **Summary:** The jobs page (for subscribed freelancers) is now a **two-pane master/detail**

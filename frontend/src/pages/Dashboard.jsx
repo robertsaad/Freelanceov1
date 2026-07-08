@@ -248,7 +248,7 @@ export default function Dashboard() {
                           (jobsTab === "best" ? matchJobs : recentJobs).map((job) => (
                             <Link
                               key={job.id}
-                              to={`/jobs/${job.id}`}
+                              to={`/jobs?job=${job.id}`}
                               className="block py-4 -mx-2 px-2 rounded-lg hover:bg-gray-50 transition-colors"
                             >
                               <div className="flex items-start justify-between gap-3">
