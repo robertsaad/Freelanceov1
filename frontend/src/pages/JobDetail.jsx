@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   MapPin,
@@ -24,7 +24,8 @@ import {
   Send,
   CheckCircle,
   Users,
-  Lock
+  Lock,
+  ArrowLeft
 } from "lucide-react";
 
 export default function JobDetail() {
@@ -189,6 +190,15 @@ export default function JobDetail() {
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
+  const copyJobLink = () => {
+    try {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success("Job link copied");
+    } catch (e) {
+      toast.error("Could not copy link");
+    }
+  };
+
   const formatBudget = () => {
     if (job.budget_min && job.budget_max) {
       return `$${job.budget_min.toLocaleString()} - $${job.budget_max.toLocaleString()}`;
@@ -231,6 +241,7 @@ export default function JobDetail() {
 
   const isOwner = user?.id === job.client_id;
   const isPreviewOnly = job.preview_only;
+  const jobUrl = typeof window !== "undefined" ? window.location.href : "";
 
   // Applicant filtering (owner view)
   const APP_FILTERS = [
@@ -256,6 +267,9 @@ export default function JobDetail() {
         <Navbar />
         
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => navigate(-1)} data-testid="back-btn">
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          </Button>
           {/* Preview Card */}
           <Card className="mb-6 border-2 border-yellow-200">
             <CardContent className="p-8">
@@ -327,7 +341,15 @@ export default function JobDetail() {
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0" data-testid="job-detail-page">
       <Navbar />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Back */}
+        <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => navigate(-1)} data-testid="back-btn">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+        </Button>
+
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Main column */}
+          <div className="w-full lg:flex-1 min-w-0">
         {/* Main Job Card */}
         <Card className="mb-6" data-testid="job-card">
           <CardContent className="p-8">
@@ -410,137 +432,93 @@ export default function JobDetail() {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            {!isOwner && user?.role === "freelancer" && job.status === "open" && (
-              <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t">
-                {hasApplied ? (
-                  <Button disabled className="bg-green-600">
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Applied
-                  </Button>
-                ) : (
-                  <Dialog open={showApplyModal} onOpenChange={setShowApplyModal}>
-                    <DialogTrigger asChild>
-                      <Button
-                        className="bg-indigo-600 hover:bg-indigo-700"
-                        data-testid="apply-btn"
-                      >
-                        <Briefcase className="h-4 w-4 mr-2" />
-                        Apply Now
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Submit a proposal</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleApply} className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Cover letter</label>
-                          <Textarea
-                            value={applyForm.cover_letter}
-                            onChange={(e) => setApplyForm({ ...applyForm, cover_letter: e.target.value })}
-                            rows={5}
-                            placeholder="Introduce yourself and explain why you're a great fit for this job..."
-                            data-testid="cover-letter-input"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">Your rate (USD)</label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={applyForm.proposed_rate}
-                              onChange={(e) => setApplyForm({ ...applyForm, proposed_rate: e.target.value })}
-                              placeholder="e.g. 1500"
-                              data-testid="proposed-rate-input"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">Rate type</label>
-                            <div className="flex gap-2 mt-1">
-                              {["fixed", "hourly"].map((rt) => (
-                                <Button
-                                  key={rt}
-                                  type="button"
-                                  variant={applyForm.proposed_rate_type === rt ? "default" : "outline"}
-                                  className={applyForm.proposed_rate_type === rt ? "bg-indigo-600 flex-1" : "flex-1"}
-                                  onClick={() => setApplyForm({ ...applyForm, proposed_rate_type: rt })}
-                                >
-                                  {rt === "fixed" ? "Fixed" : "Hourly"}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Estimated duration</label>
-                          <Input
-                            value={applyForm.estimated_duration}
-                            onChange={(e) => setApplyForm({ ...applyForm, estimated_duration: e.target.value })}
-                            placeholder="e.g. 3 weeks"
-                            data-testid="duration-input"
-                          />
-                        </div>
-                        <Button
-                          type="submit"
-                          className="w-full bg-indigo-600"
-                          disabled={submitting}
-                          data-testid="submit-application-btn"
-                        >
-                          <Send className="h-4 w-4 mr-2" />
-                          {submitting ? "Submitting..." : "Submit proposal"}
-                        </Button>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                )}
-
-                {/* Message Modal */}
-                <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" data-testid="message-btn">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Message Client
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Send Message to {job.client?.name}</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleSendMessage} className="space-y-4">
-                      <Textarea
-                        value={messageContent}
-                        onChange={(e) => setMessageContent(e.target.value)}
-                        rows={5}
-                        placeholder="Introduce yourself and explain why you're a good fit for this job..."
-                        required
-                        data-testid="message-input"
-                      />
-                      <Button 
-                        type="submit" 
-                        className="w-full bg-indigo-600" 
-                        disabled={submitting}
-                        data-testid="send-message-btn"
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        {submitting ? "Sending..." : "Send Message"}
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+            {/* Activity on this job */}
+            <div className="mt-6 pt-6 border-t">
+              <h2 className="font-semibold text-gray-900 mb-3">Activity on this job</h2>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between text-gray-600">
+                  <span>Proposals</span>
+                  <span className="font-medium text-gray-900">{job.applications_count || 0}</span>
+                </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+          </div>
+
+          {/* Sidebar */}
+          <aside className="w-full lg:w-80 lg:flex-shrink-0 space-y-6 lg:sticky lg:top-20 self-start">
+            {!isOwner && user?.role === "freelancer" && job.status === "open" && (
+              <Card>
+                <CardContent className="p-6 space-y-3">
+                  {hasApplied ? (
+                    <Button disabled className="w-full bg-green-600" data-testid="applied-badge">
+                      <CheckCircle className="h-4 w-4 mr-2" /> Applied
+                    </Button>
+                  ) : (
+                    <Button className="w-full bg-indigo-600 hover:bg-indigo-700" onClick={() => setShowApplyModal(true)} data-testid="apply-btn">
+                      <Briefcase className="h-4 w-4 mr-2" /> Apply Now
+                    </Button>
+                  )}
+                  <Button variant="outline" className="w-full" onClick={() => setShowMessageModal(true)} data-testid="message-btn">
+                    <MessageSquare className="h-4 w-4 mr-2" /> Message Client
+                  </Button>
+                </CardContent>
+              </Card>
             )}
 
             {!user && job.status === "open" && (
-              <div className="mt-6 pt-6 border-t">
-                <Button className="bg-indigo-600 hover:bg-indigo-700" asChild>
-                  <Link to="/login">Login to Apply</Link>
-                </Button>
-              </div>
+              <Card>
+                <CardContent className="p-6">
+                  <Button className="w-full bg-indigo-600 hover:bg-indigo-700" asChild>
+                    <Link to="/login">Login to Apply</Link>
+                  </Button>
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
+
+            <Card data-testid="about-client">
+              <CardHeader><CardTitle className="text-lg">About the client</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={job.client?.picture} />
+                    <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">{getInitials(job.client?.name)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{job.client_stats?.company_name || job.client?.name}</p>
+                    {job.client_stats?.industry && <p className="text-xs text-gray-500 truncate">{job.client_stats.industry}</p>}
+                  </div>
+                </div>
+                {job.client_stats?.verified && (
+                  <div className="flex items-center gap-2 text-sm text-green-700"><CheckCircle className="h-4 w-4" /> Verified client</div>
+                )}
+                <div className="space-y-2 text-sm border-t pt-4">
+                  {job.client_stats?.location && (
+                    <div className="flex items-center gap-2 text-gray-600"><MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />{job.client_stats.location}</div>
+                  )}
+                  <div className="flex items-center gap-2 text-gray-600"><Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />{job.client_stats?.jobs_posted ?? 0} job{(job.client_stats?.jobs_posted ?? 0) === 1 ? "" : "s"} posted{job.client_stats?.open_jobs ? ` · ${job.client_stats.open_jobs} open` : ""}</div>
+                  {job.client_stats?.member_since && (
+                    <div className="flex items-center gap-2 text-gray-600"><Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />Member since {new Date(job.client_stats.member_since).toLocaleDateString(undefined, { month: "short", year: "numeric" })}</div>
+                  )}
+                </div>
+                {job.client_stats?.website && (
+                  <a href={job.client_stats.website.startsWith("http") ? job.client_stats.website : `https://${job.client_stats.website}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-indigo-600 text-sm hover:underline break-all"><Globe className="h-3 w-3 flex-shrink-0" />{job.client_stats.website}</a>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <p className="text-sm font-medium text-gray-700 mb-2">Job link</p>
+                <div className="flex gap-2">
+                  <Input readOnly value={jobUrl} className="text-xs h-9" onFocus={(e) => e.target.select()} />
+                  <Button variant="outline" size="sm" onClick={copyJobLink} data-testid="copy-link-btn">Copy</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
 
         {/* Applications (Owner Only) */}
         {isOwner && (
@@ -716,6 +694,102 @@ export default function JobDetail() {
           </Card>
         )}
       </div>
+
+      {/* Apply dialog (controlled) */}
+      <Dialog open={showApplyModal} onOpenChange={setShowApplyModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit a proposal</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleApply} className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Cover letter</label>
+              <Textarea
+                value={applyForm.cover_letter}
+                onChange={(e) => setApplyForm({ ...applyForm, cover_letter: e.target.value })}
+                rows={5}
+                placeholder="Introduce yourself and explain why you're a great fit for this job..."
+                data-testid="cover-letter-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Your rate (USD)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={applyForm.proposed_rate}
+                  onChange={(e) => setApplyForm({ ...applyForm, proposed_rate: e.target.value })}
+                  placeholder="e.g. 1500"
+                  data-testid="proposed-rate-input"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Rate type</label>
+                <div className="flex gap-2 mt-1">
+                  {["fixed", "hourly"].map((rt) => (
+                    <Button
+                      key={rt}
+                      type="button"
+                      variant={applyForm.proposed_rate_type === rt ? "default" : "outline"}
+                      className={applyForm.proposed_rate_type === rt ? "bg-indigo-600 flex-1" : "flex-1"}
+                      onClick={() => setApplyForm({ ...applyForm, proposed_rate_type: rt })}
+                    >
+                      {rt === "fixed" ? "Fixed" : "Hourly"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Estimated duration</label>
+              <Input
+                value={applyForm.estimated_duration}
+                onChange={(e) => setApplyForm({ ...applyForm, estimated_duration: e.target.value })}
+                placeholder="e.g. 3 weeks"
+                data-testid="duration-input"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-indigo-600"
+              disabled={submitting}
+              data-testid="submit-application-btn"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {submitting ? "Submitting..." : "Submit proposal"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Message dialog (controlled) */}
+      <Dialog open={showMessageModal} onOpenChange={setShowMessageModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Message to {job.client?.name}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSendMessage} className="space-y-4">
+            <Textarea
+              value={messageContent}
+              onChange={(e) => setMessageContent(e.target.value)}
+              rows={5}
+              placeholder="Introduce yourself and explain why you're a good fit for this job..."
+              required
+              data-testid="message-input"
+            />
+            <Button
+              type="submit"
+              className="w-full bg-indigo-600"
+              disabled={submitting}
+              data-testid="send-message-btn"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {submitting ? "Sending..." : "Send Message"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <MobileNav />
       <div className="hidden md:block">

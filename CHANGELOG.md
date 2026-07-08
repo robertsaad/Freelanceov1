@@ -6,6 +6,27 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-08 — Upwork-style job detail + back arrows
+
+**Summary:** Clicking a job now opens an **Upwork-style two-column view** with a **back
+arrow**. Left column: status/remote/posted, title, budget/duration/applicants, description,
+skills, and "Activity on this job". Right sidebar: Apply / Message buttons, an **"About the
+client"** card (company, verified, location, jobs posted + open count, member since, website),
+and a copyable **Job link**. Back arrows added wherever a detail page was missing one.
+
+**Changed — `backend/server.py`**
+- `GET /jobs/{id}` now returns `client_stats` (jobs_posted, open_jobs, member_since,
+  location, company_name, industry, org_size, website, verified) for the sidebar.
+
+**Changed — `frontend/src/pages/JobDetail.jsx`**
+- Two-column layout, back arrow, About-the-client sidebar, job link + copy, Activity card.
+- Apply/Message moved to sidebar with controlled dialogs (removed inline `DialogTrigger`).
+
+**Changed — `frontend/src/pages/FreelancerProfile.jsx`**
+- Added a back arrow at the top of the public profile.
+
+---
+
 ## 2026-07-08 — Instagram-style portfolio gallery
 
 **Summary:** Portfolios can now scale to many projects. The profile shows a **6-item

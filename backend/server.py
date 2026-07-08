@@ -2718,6 +2718,26 @@ async def get_job(job_id: str, request: Request):
     client = await db.users.find_one({"id": job["client_id"]}, {"_id": 0, "password_hash": 0})
     if client:
         job["client"] = client
+        cprofile = await db.client_profiles.find_one({"user_id": job["client_id"]}, {"_id": 0})
+        jobs_posted = await db.jobs.count_documents({"client_id": job["client_id"]})
+        open_jobs = await db.jobs.count_documents({"client_id": job["client_id"], "status": "open"})
+        loc_parts = []
+        if cprofile:
+            if cprofile.get("city"):
+                loc_parts.append(cprofile["city"])
+            if cprofile.get("country"):
+                loc_parts.append(cprofile["country"])
+        job["client_stats"] = {
+            "jobs_posted": jobs_posted,
+            "open_jobs": open_jobs,
+            "member_since": client.get("created_at"),
+            "location": ", ".join(loc_parts) if loc_parts else None,
+            "company_name": cprofile.get("company_name") if cprofile else None,
+            "industry": cprofile.get("industry") if cprofile else None,
+            "org_size": cprofile.get("org_size") if cprofile else None,
+            "website": cprofile.get("website") if cprofile else None,
+            "verified": bool(cprofile),
+        }
     return job
 
 @api_router.put("/jobs/{job_id}")
