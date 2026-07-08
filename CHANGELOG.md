@@ -6,6 +6,25 @@ Format: each entry has a date, a short summary, the areas touched, and the key f
 
 ---
 
+## 2026-07-08 — LinkedIn-style split-view jobs + preview back fix
+
+**Summary:** The jobs page (for subscribed freelancers) is now a **two-pane master/detail**
+view like LinkedIn: a scrollable job list on the left, full details on the right. Clicking a
+job updates the detail pane in place (title, budget, description, skills, About the client,
+Apply / Message / Open full page) — keep scrolling and selecting without leaving the page.
+Guests/non-subscribed keep the preview grid. Also fixed the **Preview public profile** back
+button: it now returns to the editor (`Back to editor` → `/dashboard/profile`) via a
+`?preview=1` flag propagated through the gallery.
+
+**Changed — `frontend/src/pages/JobsList.jsx`**
+- Split list/detail layout, first-job auto-select, in-pane Apply/Message dialogs, fetches
+  `/jobs/{id}` per selection for `client_stats`. Mobile taps still open the full job page.
+
+**Changed — `frontend/src/pages/FreelancerProfile.jsx`, `EditProfile.jsx`, `PortfolioGallery.jsx`**
+- Preview flag (`?preview=1`) so back navigation returns to the profile editor.
+
+---
+
 ## 2026-07-08 — Robust back arrows (fix Preview new-tab)
 
 **Summary:** The "Preview public profile" button opens the profile in a **new tab**, where

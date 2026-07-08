@@ -284,7 +284,7 @@ export default function EditProfile() {
           </div>
           {hasProfile && profileId && (
             <Button variant="outline" asChild data-testid="preview-profile-btn">
-              <a href={`/freelancers/${profileId}`} target="_blank" rel="noopener noreferrer">
+              <a href={`/freelancers/${profileId}?preview=1`} target="_blank" rel="noopener noreferrer">
                 <Eye className="h-4 w-4 mr-2" /> Preview public profile
               </a>
             </Button>

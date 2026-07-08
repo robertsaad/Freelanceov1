@@ -37,6 +37,7 @@ export default function PortfolioGallery() {
 
   const items = freelancer?.portfolio_items || [];
   const active = activeIndex !== null ? items[activeIndex] : null;
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1";
 
   const showPrev = () => setActiveIndex((i) => (i > 0 ? i - 1 : items.length - 1));
   const showNext = () => setActiveIndex((i) => (i < items.length - 1 ? i + 1 : 0));
@@ -67,7 +68,7 @@ export default function PortfolioGallery() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(`/freelancers/${id}`)} data-testid="back-to-profile">
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/freelancers/${id}${isPreview ? "?preview=1" : ""}`)} data-testid="back-to-profile">
               <ArrowLeft className="h-4 w-4 mr-1" /> Back to profile
             </Button>
           </div>

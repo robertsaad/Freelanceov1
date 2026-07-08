@@ -220,14 +220,16 @@ export default function FreelancerProfile() {
 
   if (!freelancer) return null;
 
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1";
+
   return (
     <div className="min-h-screen bg-gray-50" data-testid="freelancer-profile-page">
       <Navbar />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back */}
-        <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => { if (window.history.length > 1) { navigate(-1); } else { const owner = user?.id && (freelancer?.user_id || freelancer?.user?.id) === user.id; navigate(owner ? "/dashboard/profile" : "/freelancers"); } }} data-testid="back-btn">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
+        <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-gray-600" onClick={() => { if (isPreview) { navigate("/dashboard/profile"); return; } if (window.history.length > 1) { navigate(-1); } else { const owner = user?.id && (freelancer?.user_id || freelancer?.user?.id) === user.id; navigate(owner ? "/dashboard/profile" : "/freelancers"); } }} data-testid="back-btn">
+          <ArrowLeft className="h-4 w-4 mr-1" /> {isPreview ? "Back to editor" : "Back"}
         </Button>
         {/* Main Profile Card */}
         <Card className="mb-6" data-testid="profile-card">
@@ -454,7 +456,7 @@ export default function FreelancerProfile() {
               </div>
               {freelancer.portfolio_items.length > 6 && (
                 <div className="text-center mt-6">
-                  <Button variant="outline" onClick={() => navigate(`/freelancers/${id}/portfolio`)} data-testid="view-all-portfolio">
+                  <Button variant="outline" onClick={() => navigate(`/freelancers/${id}/portfolio${isPreview ? "?preview=1" : ""}`)} data-testid="view-all-portfolio">
                     Show all {freelancer.portfolio_items.length} projects
                   </Button>
                 </div>
